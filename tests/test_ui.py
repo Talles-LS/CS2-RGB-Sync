@@ -117,7 +117,7 @@ def test_ui_end_to_end_live_gsi_effects_simulation_and_diagnostics(
         assert window.dashboard_page.lbl_team.text() == "CT"
         assert "weapon_m4a1_silencer" in window.dashboard_page.lbl_weapon.text()
         assert window.dashboard_page.lbl_ammo.text() == "20/20"
-        assert window.dashboard_page.card_cs2.badge_label.text() == "Conectado"
+        assert window.dashboard_page.card_cs2.badge_label.text() == "Connected"
         # Por padrão vida/equipe ficam desativados -> em idle sem eventos o LED fica apagado (0,0,0)
         assert controller.get_status().last_rgba == (0, 0, 0, 255)
 

@@ -17,10 +17,11 @@ from app.effects import _EFFECT_EVALUATORS
 from app.event_manager import EventManager
 from app.gsi_config import render_gsi_cfg
 from app.gsi_parser import GSIParser
+from app.i18n import set_language
 from app.icue_controller import ICueController, ICueStatusSnapshot, RecordingRGBController
 from app.rgb_engine import RGBEngine
 from app.sync_service import ServiceSnapshot, SyncService
-from ui.effects_page import _GROUP_META
+from ui.effects_page import get_group_meta
 from ui.main_window import MainWindow
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -542,9 +543,9 @@ def test_ui_displays_generic_identity_dynamic_device_and_neutral_disconnected_st
         window._refresh_ui()
         app.processEvents()
         assert "K70 RGB PRO" in window.dashboard_page.card_device.detail_label.text()
-        assert "NENHUM DISPOSITIVO" not in window.dashboard_page.card_device.badge_label.text()
+        assert "NO DEVICE" not in window.dashboard_page.card_device.badge_label.text()
 
-        # Estado nenhum dispositivo encontrado: exibe estado neutro "NENHUM DISPOSITIVO"
+        # Estado nenhum dispositivo encontrado: exibe estado neutro localizado ("NO DEVICE" / "NENHUM DISPOSITIVO" / "SIN DISPOSITIVO")
         snap = service.get_ui_snapshot()
         no_dev_snap = ServiceSnapshot(
             integration_running=snap.integration_running,
@@ -574,12 +575,31 @@ def test_ui_displays_generic_identity_dynamic_device_and_neutral_disconnected_st
         )
         window.dashboard_page.update_from_snapshot(no_dev_snap)
         window.diagnostics_page.update_from_snapshot(no_dev_snap)
+        assert window.dashboard_page.card_device.badge_label.text() == "NO DEVICE"
+        assert window.diagnostics_page.lbl_device.text() == "NO DEVICE"
+
+        # Verifica rótulo claro de Freezetime-only na aba Efeitos RGB em en_US e pt_BR
+        window._select_page(1)
+        meta_en = get_group_meta("team_round")
+        assert "Freezetime" in meta_en["title"]
+        assert "exclusively" in meta_en["desc"].lower()
+
+        service.set_language("pt_BR")
+        app.processEvents()
+        window.dashboard_page.update_from_snapshot(no_dev_snap)
+        window.diagnostics_page.update_from_snapshot(no_dev_snap)
         assert window.dashboard_page.card_device.badge_label.text() == "NENHUM DISPOSITIVO"
         assert window.diagnostics_page.lbl_device.text() == "NENHUM DISPOSITIVO"
+        meta_pt = get_group_meta("team_round")
+        assert "Freezetime" in meta_pt["title"]
+        assert "exclusivamente" in meta_pt["desc"].lower()
 
-        # Verifica rótulo claro de Freezetime-only na aba Efeitos RGB
-        window._select_page(1)
-        assert "Freezetime" in _GROUP_META["team_round"]["title"]
-        assert "exclusivamente" in _GROUP_META["team_round"]["desc"].lower()
+        service.set_language("es_ES")
+        app.processEvents()
+        window.dashboard_page.update_from_snapshot(no_dev_snap)
+        window.diagnostics_page.update_from_snapshot(no_dev_snap)
+        assert window.dashboard_page.card_device.badge_label.text() == "SIN DISPOSITIVO"
+        assert window.diagnostics_page.lbl_device.text() == "SIN DISPOSITIVO"
     finally:
+        set_language("en_US")
         window.shutdown_service()
