@@ -35,6 +35,7 @@ from cuesdk import (
     CueSdk,
 )
 
+from app.i18n import t
 from app.logger import get_logger
 
 
@@ -176,14 +177,14 @@ class ICueController:
         if self._sdk is not None:
             return True
         if self._sdk_path and not os.path.isfile(self._sdk_path):
-            self._last_error = f"DLL do iCUE SDK não encontrada em: {self._sdk_path}"
+            self._last_error = t("errors.icue_dll_not_found", path=self._sdk_path)
             self._logger.error(self._last_error)
             return False
         try:
             self._sdk = CueSdk(sdk_path=self._sdk_path)
             return True
         except Exception as exc:
-            self._last_error = f"Falha ao carregar iCUE SDK: {exc}"
+            self._last_error = t("errors.icue_sdk_load_failed", exc=exc)
             self._logger.error(self._last_error)
             self._sdk = None
             return False
@@ -201,13 +202,11 @@ class ICueController:
                 CorsairSessionState.CSS_Closed,
             ):
                 if evt.state == CorsairSessionState.CSS_ConnectionRefused:
-                    self._last_error = (
-                        "Conexão recusada pelo iCUE (verifique Configurações -> SDK no iCUE)."
-                    )
+                    self._last_error = t("errors.icue_refused")
                 elif evt.state == CorsairSessionState.CSS_ConnectionLost:
-                    self._last_error = "Conexão com o serviço iCUE foi perdida."
+                    self._last_error = t("errors.icue_lost")
                 elif evt.state == CorsairSessionState.CSS_Timeout:
-                    self._last_error = "Tempo esgotado aguardando o iCUE."
+                    self._last_error = t("errors.icue_timeout")
                 self._device_connected = False
                 self._last_rgba = None
                 self._session_terminal.set()
@@ -223,7 +222,9 @@ class ICueController:
                 if data.is_connected:
                     self._needs_rediscover = True
                 else:
-                    self._last_error = f"Dispositivo '{self._device_model}' desconectado."
+                    self._last_error = t(
+                        "errors.icue_device_disconnected", model=self._device_model
+                    )
             elif data.is_connected and not self._device_id:
                 self._needs_rediscover = True
 
@@ -244,7 +245,7 @@ class ICueController:
                     self._sdk, "session_state_changed_event_handler", None
                 )
                 if err != CorsairError.CE_Success:
-                    self._last_error = f"CorsairConnect falhou: {err}"
+                    self._last_error = t("errors.icue_connect_failed", err=err)
                     self._logger.warning(self._last_error)
                     return False
 
@@ -263,8 +264,8 @@ class ICueController:
 
                 if self._session_state != CorsairSessionState.CSS_Connected:
                     if not self._last_error:
-                        self._last_error = (
-                            f"iCUE SDK não conectou no tempo limite (estado={self._session_state})."
+                        self._last_error = t(
+                            "errors.icue_connect_timeout", state=self._session_state
                         )
                     return False
 
@@ -287,7 +288,7 @@ class ICueController:
             self._device_model = ""
             self._device_connected = False
             self._led_ids = ()
-            self._last_error = f"Nenhum dispositivo Corsair encontrado ({dev_err})."
+            self._last_error = t("errors.icue_no_devices", err=dev_err)
             return False
 
         candidates = self._select_device_candidates(devices)
@@ -296,7 +297,7 @@ class ICueController:
             self._device_model = ""
             self._device_connected = False
             self._led_ids = ()
-            self._last_error = "Nenhum dispositivo Corsair compatível detectado."
+            self._last_error = t("errors.icue_no_compatible")
             return False
 
         target: Optional[CorsairDeviceInfo] = None
@@ -316,11 +317,13 @@ class ICueController:
             self._device_connected = False
             self._led_ids = ()
             if last_pos_err is not None:
-                self._last_error = (
-                    f"Nenhum LED RGB disponível nos dispositivos detectados ({last_pos_err[0]}: {last_pos_err[1]})."
+                self._last_error = t(
+                    "errors.icue_no_leds_dev",
+                    model=last_pos_err[0],
+                    err=last_pos_err[1],
                 )
             else:
-                self._last_error = "Nenhum LED RGB reportado pelos dispositivos Corsair detectados."
+                self._last_error = t("errors.icue_no_leds")
             return False
 
         self._device_id = target.device_id
@@ -404,7 +407,7 @@ class ICueController:
             self._last_sdk_call_ms = (time.perf_counter_ns() - t0) / 1_000_000.0
 
             if err != CorsairError.CE_Success:
-                self._last_error = f"CorsairSetLedColors falhou: {err}"
+                self._last_error = t("errors.icue_set_color_failed", err=err)
                 if err in (
                     CorsairError.CE_NotConnected,
                     CorsairError.CE_DeviceNotFound,

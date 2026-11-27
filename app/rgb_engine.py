@@ -22,6 +22,7 @@ from typing import Any, Optional
 from app.effects import EffectInput, RGBColor, lerp_color, resolve_active_effect
 from app.event_manager import EventType, GameEvent
 from app.gsi_parser import GameStateSnapshot
+from app.i18n import t
 from app.icue_controller import RGBHardwareController
 from app.logger import get_logger
 
@@ -45,9 +46,10 @@ class EngineRenderState:
     """Snapshot do estado visual e de desempenho do motor RGB."""
 
     running: bool = False
+    paused: bool = False
     simulation_mode: bool = False
     active_effect_id: str = "idle"
-    active_effect_label: str = "Aguardando jogo"
+    active_effect_label: str = "Waiting for game"
     current_color_hex: str = "#000000"
     current_rgb: tuple[int, int, int] = (0, 0, 0)
     tick_ms: int = 25
@@ -84,8 +86,11 @@ class RGBEngine:
 
         self._current_color: Optional[RGBColor] = None
         self._active_effect_id: str = "idle"
-        self._active_effect_label: str = "Aguardando jogo"
+        self._active_effect_label: str = t("engine.waiting_game")
         self._frames_rendered: int = 0
+
+        self._paused: bool = False
+        self._paused_at_ns: int = 0
 
         # Controle de latência de software
         self._pending_gsi_ns: int = 0
@@ -102,6 +107,68 @@ class RGBEngine:
         self._running = False
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
+
+    def set_paused(self, paused: bool) -> None:
+        """Pause or resume time progression cleanly without losing bomb/shot timers."""
+        now_ns = time.perf_counter_ns()
+        with self._state_lock:
+            flag = bool(paused)
+            if flag == self._paused:
+                return
+            if flag:
+                self._paused = True
+                self._paused_at_ns = now_ns
+            else:
+                delta_ns = max(0, now_ns - self._paused_at_ns) if self._paused_at_ns > 0 else 0
+                if self._bomb_planted_at_ns is not None:
+                    self._bomb_planted_at_ns += delta_ns
+                if self._shot_active_until_ns > 0:
+                    self._shot_active_until_ns += delta_ns
+                self._last_step_ns = now_ns
+                self._paused_at_ns = 0
+                self._paused = False
+
+    def is_paused(self) -> bool:
+        with self._state_lock:
+            return self._paused
+
+    def reset_transient_state(self) -> None:
+        """Clear transient flashbang/shot/C4 timers and rendered color state."""
+        with self._state_lock:
+            self._current_color = None
+            self._shot_active_until_ns = 0
+            self._bomb_planted_at_ns = None
+            self._flash_level = 0.0
+            self._flash_target = 0.0
+            self._flash_pending_peak = 0.0
+            self._flash_episode_max_raw = 0
+            self._flash_binary_mode = False
+            self._last_step_ns = 0
+            self._last_logged_effect_id = ""
+            self._last_logged_flash_level = 0.0
+            self._active_effect_id = "idle"
+            self._active_effect_label = (
+                t("engine.waiting_game") if self._running else t("engine.stopped")
+            )
+
+    def refresh_labels(self) -> None:
+        """Refresh active_effect_label after an active language switch."""
+        with self._state_lock:
+            running = self._running
+            was_paused = self._paused
+            snapshot = self._snapshot
+        if running and not was_paused:
+            self.step()
+            return
+        with self._state_lock:
+            if not running:
+                self._active_effect_label = t("engine.waiting_game")
+            elif not snapshot.connected or snapshot.player_activity == "menu":
+                self._active_effect_label = (
+                    t("engine.cs2_menu") if snapshot.connected else t("engine.waiting_cs2")
+                )
+            elif self._active_effect_id == "idle":
+                self._active_effect_label = t("engine.standby_led_off")
 
     def update_config(self, config: dict[str, Any]) -> None:
         """Atualiza configurações em tempo de execução de forma thread-safe."""
@@ -221,6 +288,7 @@ class RGBEngine:
             tick_ms = self._get_tick_ms_locked()
             return EngineRenderState(
                 running=self._running,
+                paused=self._paused,
                 simulation_mode=self._simulation_mode,
                 active_effect_id=self._active_effect_id,
                 active_effect_label=self._active_effect_label,
@@ -252,6 +320,8 @@ class RGBEngine:
         eval_ns = now_ns if now_ns is not None else time.perf_counter_ns()
 
         with self._state_lock:
+            if self._paused:
+                return self.get_render_state()
             snapshot = self._snapshot
             config = self._config
             shot_until = self._shot_active_until_ns
@@ -332,7 +402,7 @@ class RGBEngine:
                 self._current_color = None
                 self._active_effect_id = "idle"
                 self._active_effect_label = (
-                    "Menu do CS2" if snapshot.connected else "Aguardando CS2"
+                    t("engine.cs2_menu") if snapshot.connected else t("engine.waiting_cs2")
                 )
                 self._frames_rendered += 1
             return self.get_render_state()
@@ -356,7 +426,7 @@ class RGBEngine:
                     self._last_logged_flash_level = 0.0
                 self._current_color = RGBColor(0, 0, 0)
                 self._active_effect_id = "idle"
-                self._active_effect_label = "Em espera (LED apagado)"
+                self._active_effect_label = t("engine.standby_led_off")
                 self._frames_rendered += 1
             return self.get_render_state()
 
@@ -481,7 +551,9 @@ class RGBEngine:
             self._last_logged_effect_id = ""
             self._last_logged_flash_level = 0.0
             self._active_effect_id = "idle"
-            self._active_effect_label = "Parado"
+            self._active_effect_label = t("engine.stopped")
+            self._paused = False
+            self._paused_at_ns = 0
 
         if release_controller:
             if restore_on_exit:

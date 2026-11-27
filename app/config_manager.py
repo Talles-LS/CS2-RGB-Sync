@@ -20,6 +20,7 @@ import threading
 from pathlib import Path
 from typing import Any, Optional
 
+from app.i18n import DEFAULT_LANGUAGE, is_valid_language, normalize_language, t
 from app.logger import get_logger, register_sensitive_token
 
 REQUIRED_LOOPBACK_HOST = "127.0.0.1"
@@ -199,6 +200,21 @@ class ConfigManager:
             cfg["config_version"] = 2
             changed = True
 
+        ui_cfg = cfg.setdefault("ui", {})
+        if not isinstance(ui_cfg, dict):
+            ui_cfg = {}
+            cfg["ui"] = ui_cfg
+            changed = True
+        raw_lang = ui_cfg.get("language")
+        if is_valid_language(raw_lang):
+            canonical_lang = normalize_language(raw_lang)
+            if raw_lang != canonical_lang:
+                ui_cfg["language"] = canonical_lang
+                changed = True
+        else:
+            ui_cfg["language"] = DEFAULT_LANGUAGE
+            changed = True
+
         register_sensitive_token(token)
         return changed
 
@@ -231,9 +247,7 @@ class ConfigManager:
         """Define um valor usando caminho pontuado e opcionalmente salva no disco."""
         with self._lock:
             if dotted_key == "server.host" and value != REQUIRED_LOOPBACK_HOST:
-                raise ValueError(
-                    "Por segurança, o servidor HTTP deve escutar exclusivamente em 127.0.0.1."
-                )
+                raise ValueError(t("errors.loopback_only"))
             if dotted_key == "server.port":
                 if (
                     not isinstance(value, int)
@@ -241,12 +255,19 @@ class ConfigManager:
                     or not (MIN_PORT <= value <= MAX_PORT)
                 ):
                     raise ValueError(
-                        f"Porta inválida: {value}. Utilize um valor entre {MIN_PORT} e {MAX_PORT}."
+                        t(
+                            "errors.invalid_port",
+                            port=value,
+                            min_port=MIN_PORT,
+                            max_port=MAX_PORT,
+                        )
                     )
             if dotted_key == "server.token":
                 if not isinstance(value, str) or len(value.strip()) < 8:
-                    raise ValueError("Token GSI deve ter ao menos 8 caracteres.")
+                    raise ValueError(t("errors.invalid_token"))
                 register_sensitive_token(value)
+            if dotted_key == "ui.language":
+                value = normalize_language(str(value) if value is not None else "")
 
             parts = dotted_key.split(".")
             curr = self._config

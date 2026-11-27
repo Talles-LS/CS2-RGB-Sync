@@ -24,6 +24,7 @@ from app.event_manager import EventManager, GameEvent
 from app.gsi_config import detect_cs2_game_dir, install_gsi_cfg
 from app.gsi_parser import GSIParser, GameStateSnapshot
 from app.gsi_server import GSIServer, GSIServerStats
+from app.i18n import normalize_language, set_language as set_i18n_language, t
 from app.icue_controller import (
     ICueController,
     ICueStatusSnapshot,
@@ -60,6 +61,7 @@ class ServiceSnapshot:
     recent_events: tuple[EventLogItem, ...]
     recent_logs: str
     last_service_error: str
+    simulation_paused: bool = False
 
 
 class SyncService:
@@ -80,6 +82,8 @@ class SyncService:
         self._data_lock = threading.RLock()
 
         cfg = self._config_mgr.get_all()
+        set_i18n_language(str(cfg.get("ui", {}).get("language", "en_US")))
+
         if controller is not None:
             self._controller: RGBHardwareController = controller
         elif controller_factory is not None:
@@ -99,10 +103,13 @@ class SyncService:
         self._consumer_stop = threading.Event()
         self._integration_running = False
         self._simulation_mode = bool(cfg.get("engine", {}).get("simulation_mode", False))
+        self._sim_paused = False
 
-        self._latest_snapshot = GameStateSnapshot(connected=False)
+        self._real_snapshot = GameStateSnapshot(connected=False)
+        self._sim_snapshot = GameStateSnapshot(connected=False)
         self._recent_events: deque[EventLogItem] = deque(maxlen=80)
-        self._last_payload: Optional[dict[str, Any]] = None
+        self._real_last_payload: Optional[dict[str, Any]] = None
+        self._sim_last_payload: Optional[dict[str, Any]] = None
         self._last_service_error: str = ""
 
     @staticmethod
@@ -135,11 +142,19 @@ class SyncService:
     def get_config(self) -> dict[str, Any]:
         return self._config_mgr.get_all()
 
+    def set_language(self, lang_code: str) -> str:
+        """Persist ui.language and update active runtime language immediately."""
+        canonical = normalize_language(lang_code)
+        self._config_mgr.set("ui.language", canonical, save_now=True)
+        set_i18n_language(canonical)
+        self._engine.refresh_labels()
+        return canonical
+
     def start_integration(self) -> tuple[bool, str]:
         """Inicia servidor GSI, conecta iCUE (sem falhar se ausente) e liga o motor RGB."""
         with self._lifecycle_lock:
             if self._integration_running:
-                return True, "Integração já está em execução."
+                return True, t("service.already_running")
 
             cfg = self._config_mgr.get_all()
             port = (
@@ -153,7 +168,7 @@ class SyncService:
                 server = GSIServer(host="127.0.0.1", port=port, auth_token=token)
                 active_port = server.start()
             except Exception as exc:
-                msg = f"Falha ao iniciar servidor GSI na porta {port}: {exc}"
+                msg = t("errors.gsi_server_start_failed", port=port, exc=exc)
                 with self._data_lock:
                     self._last_service_error = msg
                 self._logger.error(msg)
@@ -181,9 +196,12 @@ class SyncService:
                 self._last_service_error = ""
 
             hw_ok = self._controller.is_connected()
-            info_msg = (
-                f"Integração ativa em http://127.0.0.1:{active_port}/ "
-                f"({'dispositivo conectado' if hw_ok else 'aguardando iCUE/dispositivo'})"
+            info_msg = t(
+                "service.active_fmt",
+                port=active_port,
+                hw_status=t(
+                    "service.device_connected" if hw_ok else "service.waiting_device"
+                ),
             )
             self._logger.info(info_msg)
             return True, info_msg
@@ -206,7 +224,8 @@ class SyncService:
             self._engine.stop(release_controller=True)
             self._integration_running = False
             with self._data_lock:
-                self._latest_snapshot = GameStateSnapshot(connected=False)
+                self._sim_paused = False
+                self._real_snapshot = GameStateSnapshot(connected=False)
 
     def _consume_gsi_loop(self) -> None:
         last_activity: Optional[str] = None
@@ -219,10 +238,8 @@ class SyncService:
             try:
                 msg = server.event_queue.get(timeout=0.1)
                 with self._data_lock:
+                    self._real_last_payload = msg.payload
                     sim_active = self._simulation_mode
-                    self._last_payload = msg.payload
-                if sim_active:
-                    continue
 
                 raw_payload = msg.payload if isinstance(msg.payload, dict) else {}
                 raw_player = (
@@ -257,6 +274,11 @@ class SyncService:
                     received_at_wall=msg.received_at_wall,
                 )
                 events = self._event_mgr.process_snapshot(snap)
+                with self._data_lock:
+                    self._real_snapshot = snap
+
+                if sim_active:
+                    continue
 
                 has_diag_event = any(
                     ev.event_type.value
@@ -336,7 +358,7 @@ class SyncService:
             except Exception as exc:
                 self._logger.exception("Erro no consumidor de eventos GSI")
                 with self._data_lock:
-                    self._last_service_error = f"Erro no consumidor GSI: {exc}"
+                    self._last_service_error = t("service.gsi_consumer_error", exc=exc)
 
     def _record_events(
         self,
@@ -347,7 +369,10 @@ class SyncService:
     ) -> None:
         ts_str = time.strftime("%H:%M:%S")
         with self._data_lock:
-            self._latest_snapshot = snap
+            if simulation:
+                self._sim_snapshot = snap
+            else:
+                self._real_snapshot = snap
             for ev in events:
                 summary = ", ".join(f"{k}={v}" for k, v in ev.data.items())
                 self._recent_events.appendleft(
@@ -359,77 +384,206 @@ class SyncService:
                     )
                 )
 
+    def _sync_event_managers(self, cfg: dict[str, Any]) -> None:
+        effects = cfg.get("effects", {})
+        gsi = cfg.get("gsi", {})
+        shot_deb = float(effects.get("shot", {}).get("debounce_ms", 40.0))
+        crit_thresh = int(effects.get("health", {}).get("critical_threshold", 25))
+        disc_timeout = float(gsi.get("disconnect_timeout_s", 35.0))
+        fire_on = bool(effects.get("fire", {}).get("enabled", True))
+        for mgr in (self._event_mgr, self._sim_event_mgr):
+            mgr.shot_debounce_ms = shot_deb
+            mgr.critical_health_threshold = crit_thresh
+            mgr.disconnect_timeout_s = disc_timeout
+            mgr.fire_enabled = fire_on
+
+    def _connect_controller_for_sim(self) -> None:
+        if self._controller.is_connected():
+            return
+        if not isinstance(self._controller, ICueController) or is_icue_process_running():
+            self._controller.connect(timeout_s=1.0)
+
+    def _seed_sim_baseline(self, *, record: bool = False) -> GameStateSnapshot:
+        cfg = self._config_mgr.get_all()
+        baseline_payload = self._simulator.reset()
+        self._sim_parser.reset()
+        self._sim_event_mgr = self._build_event_manager(cfg)
+        self._engine.update_config(cfg)
+        self._engine.set_paused(False)
+        self._engine.reset_transient_state()
+
+        now_ns = time.perf_counter_ns()
+        snap = self._sim_parser.parse(
+            baseline_payload,
+            received_at_ns=now_ns,
+            received_at_wall=time.time(),
+        )
+        events = self._sim_event_mgr.process_snapshot(snap)
+        with self._data_lock:
+            self._sim_last_payload = baseline_payload
+            self._sim_snapshot = snap
+            self._sim_paused = False
+        self._engine.update_state(snap, events, simulation_mode=True, now_ns=now_ns)
+        if record:
+            self._record_events(snap, events, simulation=True)
+        return snap
+
     def set_simulation_mode(self, enabled: bool) -> None:
-        """Ativa ou desativa explicitamente o modo de simulação."""
+        """Ativa ou desativa explicitamente o modo de simulação com ciclo real de renderização."""
         flag = bool(enabled)
-        with self._data_lock:
-            self._simulation_mode = flag
-            self._config_mgr.set("engine.simulation_mode", flag)
-            if not flag:
+        with self._lifecycle_lock:
+            with self._data_lock:
+                self._simulation_mode = flag
+                self._sim_paused = False
+                self._config_mgr.set("engine.simulation_mode", flag)
+
+            if flag:
+                self._connect_controller_for_sim()
+                self._seed_sim_baseline(record=True)
+                self._engine.start()
+                self._engine.step()
+            else:
+                self._simulator.reset()
                 self._sim_parser.reset()
                 self._sim_event_mgr.reset()
-                self._latest_snapshot = self._parser.current_state
-                self._engine.update_state(
-                    self._parser.current_state, [], simulation_mode=False
-                )
-            else:
-                self._engine.update_state(
-                    self._sim_parser.current_state, [], simulation_mode=True
-                )
+                with self._data_lock:
+                    self._sim_last_payload = None
+                    self._sim_snapshot = GameStateSnapshot(connected=False)
+                self._engine.set_paused(False)
+                self._engine.reset_transient_state()
+                if self._integration_running:
+                    with self._data_lock:
+                        real_snap = self._real_snapshot
+                    self._engine.update_state(
+                        real_snap, [], simulation_mode=False
+                    )
+                    self._engine.step()
+                else:
+                    self._engine.stop(release_controller=False)
 
-    def trigger_simulation(self, action: str, **kwargs: Any) -> None:
-        """Dispara um estado ou evento simulado sem misturá-lo com dados reais."""
-        with self._data_lock:
+    def set_simulation_paused(self, paused: bool) -> bool:
+        """Pause or resume simulation time progression and trigger inputs."""
+        with self._lifecycle_lock:
+            with self._data_lock:
+                if not self._simulation_mode:
+                    return False
+                self._sim_paused = bool(paused)
+            self._engine.set_paused(self._sim_paused)
+            return True
+
+    def reset_simulation(self) -> None:
+        """Reset all simulator state, parser, event history, and transient RGB timers."""
+        with self._lifecycle_lock:
+            with self._data_lock:
+                if not self._simulation_mode:
+                    pass
             if not self._simulation_mode:
-                self._simulation_mode = True
-                self._config_mgr.set("engine.simulation_mode", True)
-
-            if action == "flashbang":
-                payload = self._simulator.set_flashed(int(kwargs.get("intensity", 255)))
-            elif action == "shot":
-                payload = self._simulator.trigger_shot()
-            elif action == "c4_planted":
-                payload = self._simulator.set_bomb("planted")
-            elif action == "c4_defused":
-                payload = self._simulator.set_bomb("defused")
-            elif action == "c4_exploded":
-                payload = self._simulator.set_bomb("exploded")
-            elif action == "fire":
-                payload = self._simulator.set_burning(int(kwargs.get("intensity", 180)))
-            elif action == "health":
-                payload = self._simulator.set_health(int(kwargs.get("health", 100)))
-            elif action == "team":
-                payload = self._simulator.set_team(str(kwargs.get("team", "CT")))
-            elif action == "freezetime":
-                payload = self._simulator.set_round_phase("freezetime")
-            elif action == "live":
-                payload = self._simulator.set_round_phase("live")
-            elif action == "weapon":
-                payload = self._simulator.select_weapon(str(kwargs.get("category", "rifle")))
-            elif action == "disconnect":
-                self._sim_parser.reset()
-                self._sim_event_mgr.reset()
-                disc = GameStateSnapshot(connected=False)
-                self._latest_snapshot = disc
-                self._engine.update_state(disc, [], simulation_mode=True)
+                self.set_simulation_mode(True)
                 return
-            else:
-                raise ValueError(f"Ação de simulação desconhecida: {action}")
+            self._connect_controller_for_sim()
+            self._seed_sim_baseline(record=True)
+            self._engine.start()
+            self._engine.step()
 
-            self._last_payload = payload
+    def trigger_simulation(self, action: str, **kwargs: Any) -> bool:
+        """Execute a simulated game action through GSIParser -> EventManager -> RGBEngine."""
+        with self._lifecycle_lock:
+            if not self._simulation_mode:
+                self.set_simulation_mode(True)
+
+            with self._data_lock:
+                if self._sim_paused:
+                    return False
+
+            if action == "reset":
+                self.reset_simulation()
+                return True
+
+            if action == "disconnect":
+                self._simulator.reset()
+                disc = self._sim_parser.mark_disconnected()
+                events = self._sim_event_mgr.process_snapshot(disc)
+                with self._data_lock:
+                    self._sim_last_payload = None
+                    self._sim_snapshot = disc
+                self._engine.reset_transient_state()
+                self._engine.update_state(disc, events, simulation_mode=True)
+                self._record_events(disc, events, simulation=True)
+                self._engine.step()
+                return True
+
+            # Ensure connected simulator baseline exists before delta-based actions
+            if not self._sim_parser.current_state.connected:
+                base_payload = self._simulator.build_payload()
+                t_init = time.perf_counter_ns()
+                init_snap = self._sim_parser.parse(
+                    base_payload, received_at_ns=t_init, received_at_wall=time.time()
+                )
+                init_events = self._sim_event_mgr.process_snapshot(init_snap)
+                self._engine.update_state(
+                    init_snap, init_events, simulation_mode=True, now_ns=t_init
+                )
+
+            if action == "shot":
+                baseline = self._simulator.prepare_shot_baseline()
+                t_base = time.perf_counter_ns()
+                if baseline is not None:
+                    base_snap = self._sim_parser.parse(
+                        baseline, received_at_ns=t_base, received_at_wall=time.time()
+                    )
+                    base_events = self._sim_event_mgr.process_snapshot(base_snap)
+                    self._engine.update_state(
+                        base_snap, base_events, simulation_mode=True, now_ns=t_base
+                    )
+                payload = self._simulator.trigger_shot()
+                t_act = max(time.perf_counter_ns(), t_base + 1_000_000)
+            else:
+                if action == "flashbang":
+                    payload = self._simulator.set_flashed(int(kwargs.get("intensity", 255)))
+                elif action in ("c4_planted", "c4"):
+                    state_arg = str(kwargs.get("state", "planted"))
+                    payload = self._simulator.set_bomb(None if state_arg == "none" else state_arg)
+                elif action == "c4_defused":
+                    payload = self._simulator.set_bomb("defused")
+                elif action == "c4_exploded":
+                    payload = self._simulator.set_bomb("exploded")
+                elif action == "c4_clear":
+                    payload = self._simulator.set_bomb(None)
+                elif action == "fire":
+                    payload = self._simulator.set_burning(int(kwargs.get("intensity", 180)))
+                elif action == "health":
+                    payload = self._simulator.set_health(int(kwargs.get("health", 100)))
+                elif action == "team":
+                    payload = self._simulator.set_team(str(kwargs.get("team", "CT")))
+                elif action == "round_phase":
+                    payload = self._simulator.set_round_phase(str(kwargs.get("phase", "live")))
+                elif action == "freezetime":
+                    payload = self._simulator.set_round_phase("freezetime")
+                elif action == "live":
+                    payload = self._simulator.set_round_phase("live")
+                elif action == "over":
+                    payload = self._simulator.set_round_phase("over")
+                elif action == "weapon":
+                    payload = self._simulator.select_weapon(str(kwargs.get("category", "rifle")))
+                else:
+                    raise ValueError(t("errors.unknown_sim_action", action=action))
+                t_act = time.perf_counter_ns()
+
+            with self._data_lock:
+                self._sim_last_payload = payload
+
             snap = self._sim_parser.parse(
                 payload,
-                received_at_ns=time.perf_counter_ns(),
+                received_at_ns=t_act,
                 received_at_wall=time.time(),
             )
             events = self._sim_event_mgr.process_snapshot(snap)
-
-        if self._integration_running and not self._controller.is_connected():
-            self._controller.connect(timeout_s=1.0)
-        self._engine.update_state(snap, events, simulation_mode=True)
-        self._record_events(snap, events, simulation=True)
-        if not self._integration_running:
-            self._engine.step()
+            self._connect_controller_for_sim()
+            self._engine.update_state(snap, events, simulation_mode=True, now_ns=t_act)
+            self._record_events(snap, events, simulation=True)
+            self._engine.start()
+            self._engine.step(now_ns=t_act + 1_000_000)
+            return True
 
     def apply_config(
         self,
@@ -438,11 +592,16 @@ class SyncService:
         apply_windows_startup: bool = False,
     ) -> tuple[bool, str]:
         """Valida, persiste e aplica novas configurações em tempo de execução."""
+        with self._data_lock:
+            prev_sim_mode = self._simulation_mode
         try:
             old_port = int(self._config_mgr.get("server.port", 3000))
             saved = self._config_mgr.update(new_config, save_now=True)
         except Exception as exc:
-            return False, f"Configuração inválida: {exc}"
+            return False, t("errors.invalid_config", exc=exc)
+
+        saved_lang = str(saved.get("ui", {}).get("language", "en_US"))
+        set_i18n_language(saved_lang)
 
         new_port = int(saved["server"]["port"])
         hw = saved.get("hardware", {})
@@ -455,23 +614,12 @@ class SyncService:
             )
 
         self._engine.update_config(saved)
-        effects = saved.get("effects", {})
-        gsi = saved.get("gsi", {})
-        self._event_mgr.shot_debounce_ms = float(
-            effects.get("shot", {}).get("debounce_ms", 40.0)
-        )
-        self._event_mgr.critical_health_threshold = int(
-            effects.get("health", {}).get("critical_threshold", 25)
-        )
-        self._event_mgr.disconnect_timeout_s = float(
-            gsi.get("disconnect_timeout_s", 35.0)
-        )
-        self._event_mgr.fire_enabled = bool(effects.get("fire", {}).get("enabled", True))
+        self._sync_event_managers(saved)
+        self._engine.refresh_labels()
 
-        with self._data_lock:
-            self._simulation_mode = bool(
-                saved.get("engine", {}).get("simulation_mode", False)
-            )
+        new_sim_mode = bool(saved.get("engine", {}).get("simulation_mode", False))
+        if new_sim_mode != prev_sim_mode:
+            self.set_simulation_mode(new_sim_mode)
 
         if apply_windows_startup:
             set_windows_startup(bool(saved.get("ui", {}).get("start_with_windows", False)))
@@ -489,18 +637,21 @@ class SyncService:
                         )
                         self._server.start()
                     except Exception as exc:
-                        return False, f"Configuração salva, mas falha ao reiniciar porta {new_port}: {exc}"
+                        return False, t("errors.gsi_server_start_failed", port=new_port, exc=exc)
 
-        return True, "Configurações salvas e aplicadas com sucesso."
+        return True, t("service.config_applied")
 
     def restore_default_settings(self) -> dict[str, Any]:
-        """Restaura padrões de `default_config.json`, preservando token e caminho do CS2."""
+        """Restaura padrões de `default_config.json`, preservando token, caminho do CS2 e idioma."""
         current = self._config_mgr.get_all()
         defaults = json.loads(
             self._config_mgr.default_config_path.read_text(encoding="utf-8")
         )
         defaults["server"]["token"] = current["server"]["token"]
         defaults["gsi"]["cs2_path"] = current["gsi"].get("cs2_path", "")
+        defaults.setdefault("ui", {})["language"] = current.get("ui", {}).get(
+            "language", "en_US"
+        )
         self.apply_config(defaults, apply_windows_startup=False)
         return self._config_mgr.get_all()
 
@@ -518,10 +669,7 @@ class SyncService:
         candidate = cs2_path or cfg["gsi"].get("cs2_path") or None
         detected = detect_cs2_game_dir(preferred_path=candidate)
         if detected is None:
-            return (
-                False,
-                "Pasta válida do CS2 (game\\csgo\\cfg) não encontrada. Selecione manualmente.",
-            )
+            return False, t("service.cs2_folder_invalid")
         try:
             self._config_mgr.set("gsi.cs2_path", str(detected))
             target = install_gsi_cfg(
@@ -533,9 +681,9 @@ class SyncService:
                 timeout=float(cfg["gsi"]["timeout"]),
                 heartbeat=float(cfg["gsi"]["heartbeat"]),
             )
-            return True, f"Arquivo GSI instalado em: {target}"
+            return True, t("service.gsi_installed_fmt", target=target)
         except Exception as exc:
-            return False, f"Erro ao instalar arquivo GSI: {exc}"
+            return False, t("errors.gsi_install_error", exc=exc)
 
     def regenerate_token_and_reinstall(self) -> tuple[bool, str]:
         """Gera novo token GSI, atualiza servidor ativo e reinstala o `.cfg` se possível."""
@@ -547,9 +695,9 @@ class SyncService:
         if cs2_path:
             ok, msg = self.install_gsi_file(cs2_path)
             if ok:
-                return True, f"Novo token gerado e arquivo GSI atualizado ({msg})."
-            return True, f"Novo token gerado, mas atualize o arquivo GSI manualmente: {msg}"
-        return True, "Novo token gerado e salvo localmente."
+                return True, t("service.token_regen_reinstalled_fmt", msg=msg)
+            return True, t("service.token_regen_manual_fmt", msg=msg)
+        return True, t("service.token_regen_local")
 
     def get_ui_snapshot(self) -> ServiceSnapshot:
         """Retorna um retrato completo e thread-safe para renderização na UI."""
@@ -596,17 +744,26 @@ class SyncService:
         logs_text = get_ring_buffer_handler().get_text()
 
         with self._data_lock:
+            active_snap = (
+                self._sim_snapshot if self._simulation_mode else self._real_snapshot
+            )
+            active_payload = (
+                self._sim_last_payload
+                if self._simulation_mode
+                else self._real_last_payload
+            )
             return ServiceSnapshot(
                 integration_running=self._integration_running,
                 simulation_mode=self._simulation_mode,
                 icue_status=icue_status,
                 server_stats=server_stats,
-                game_state=self._latest_snapshot,
+                game_state=active_snap,
                 render_state=render_state,
-                last_payload=copy.deepcopy(self._last_payload),
+                last_payload=copy.deepcopy(active_payload),
                 recent_events=tuple(self._recent_events),
                 recent_logs=logs_text,
                 last_service_error=self._last_service_error,
+                simulation_paused=self._sim_paused,
             )
 
     def shutdown(self) -> None:

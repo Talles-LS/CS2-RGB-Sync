@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from app.gsi_parser import GameStateSnapshot
+from app.i18n import t
 
 DEFAULT_PRIORITY_ORDER: tuple[str, ...] = (
     "flashbang",
@@ -145,7 +146,7 @@ def evaluate_flashbang(ctx: EffectInput) -> Optional[EffectResult]:
     display_val = max(1, round(level * 255)) if raw_active else round(level * 255)
     return EffectResult(
         effect_id="flashbang",
-        label=f"Flashbang ({display_val}/255)",
+        label=t("engine.effect_flashbang", val=display_val),
         color=color,
         instant=True,
     )
@@ -161,7 +162,7 @@ def evaluate_shot(ctx: EffectInput) -> Optional[EffectResult]:
     base = RGBColor.from_hex(cfg.get("color", "#FF9900"), (255, 153, 0))
     return EffectResult(
         effect_id="shot",
-        label="Disparo",
+        label=t("engine.effect_shot"),
         color=base.scale(_intensity_factor(cfg)),
         instant=True,
     )
@@ -236,7 +237,7 @@ def evaluate_c4(ctx: EffectInput) -> Optional[EffectResult]:
     progress = min(1.0, elapsed_s / timer_s)
     return EffectResult(
         effect_id="c4",
-        label=f"C4 Plantada ({progress * 100:.0f}%)",
+        label=t("engine.effect_c4", pct=progress * 100),
         color=base.scale(brightness),
         instant=True,
     )
@@ -260,7 +261,7 @@ def evaluate_fire(ctx: EffectInput) -> Optional[EffectResult]:
     mixed = lerp_color(c1, c2, blend)
     return EffectResult(
         effect_id="fire",
-        label=f"Dano de Fogo ({burning})",
+        label=t("engine.effect_fire", val=burning),
         color=mixed.scale(_intensity_factor(cfg)),
         instant=False,
     )
@@ -281,7 +282,7 @@ def evaluate_health_critical(ctx: EffectInput) -> Optional[EffectResult]:
     pulse = 0.25 + 0.75 * (0.5 * (1.0 + math.sin(2.0 * math.pi * hz * t_s)))
     return EffectResult(
         effect_id="health_critical",
-        label=f"Vida Crítica ({hp} HP)",
+        label=t("engine.effect_health_critical", hp=hp),
         color=crit_color.scale(pulse * _intensity_factor(cfg)),
         instant=False,
     )
@@ -319,7 +320,7 @@ def evaluate_health(ctx: EffectInput) -> Optional[EffectResult]:
 
     return EffectResult(
         effect_id="health",
-        label=f"Vida ({hp} HP)",
+        label=t("engine.effect_health", hp=hp),
         color=color.scale(_intensity_factor(cfg)),
         instant=False,
     )
@@ -335,10 +336,10 @@ def evaluate_team_round(ctx: EffectInput) -> Optional[EffectResult]:
     team = (ctx.snapshot.team or "").upper()
     if team == "T":
         base = RGBColor.from_hex(cfg.get("t_color", "#FF9900"), (255, 153, 0))
-        team_label = "TR"
+        team_label = t("dashboard.team_t")
     elif team == "CT":
         base = RGBColor.from_hex(cfg.get("ct_color", "#008CFF"), (0, 140, 255))
-        team_label = "CT"
+        team_label = t("dashboard.team_ct")
     else:
         return None
 
@@ -349,14 +350,14 @@ def evaluate_team_round(ctx: EffectInput) -> Optional[EffectResult]:
         pulse = 0.35 + 0.65 * (0.5 * (1.0 + math.sin(2.0 * math.pi * hz * t_s)))
         return EffectResult(
             effect_id="team_round",
-            label=f"Freezetime ({team_label})",
+            label=t("engine.effect_freezetime", team=team_label),
             color=base.scale(pulse * intensity),
             instant=True,
         )
 
     return EffectResult(
         effect_id="team_round",
-        label=f"Freezetime ({team_label})",
+        label=t("engine.effect_freezetime", team=team_label),
         color=base.scale(intensity),
         instant=False,
     )
@@ -378,7 +379,7 @@ def evaluate_weapon(ctx: EffectInput) -> Optional[EffectResult]:
     base = RGBColor.from_hex(hex_color, (200, 200, 200))
     return EffectResult(
         effect_id="weapon",
-        label=f"Arma ({weapon.category}: {weapon.name})",
+        label=t("engine.effect_weapon", category=weapon.category, name=weapon.name),
         color=base.scale(_intensity_factor(cfg)),
         instant=False,
     )

@@ -24,6 +24,7 @@ from app.gsi_config import (  # noqa: E402
     normalize_cs2_game_dir,
     uninstall_gsi_cfg,
 )
+from app.i18n import set_language as set_i18n_language, t  # noqa: E402
 from app.logger import REDACTED_PLACEHOLDER, configure_logging, get_logger  # noqa: E402
 
 
@@ -37,11 +38,12 @@ def _run_setup_gsi(cs2_dir_arg: str, config_path: Optional[str]) -> int:
     cfg_mgr = ConfigManager(
         user_config_path=Path(config_path) if config_path else None
     )
+    set_i18n_language(str(cfg_mgr.get("ui.language", "en_US")))
     detected = detect_cs2_game_dir(preferred_path=cs2_dir_arg)
     if detected is None:
-        msg = f"Pasta válida do CS2 (game\\csgo\\cfg) não encontrada em: {cs2_dir_arg}"
+        msg = t("cli.cs2_dir_not_found", path=cs2_dir_arg)
         logger.error(msg)
-        _safe_print(f"[ERRO] {msg}")
+        _safe_print(f"[ERROR] {msg}")
         return 2
 
     cfg_mgr.set("gsi.cs2_path", str(detected))
@@ -54,7 +56,7 @@ def _run_setup_gsi(cs2_dir_arg: str, config_path: Optional[str]) -> int:
         timeout=float(cfg_mgr.get("gsi.timeout", 5.0)),
         heartbeat=float(cfg_mgr.get("gsi.heartbeat", 15.0)),
     )
-    _safe_print(f"[OK] GSI instalado em: {target}")
+    _safe_print(t("cli.gsi_installed", target=target))
     return 0
 
 
@@ -66,9 +68,9 @@ def _run_uninstall_gsi(cs2_dir_arg: str) -> int:
         cfg_file = Path(cs2_dir_arg) / "cfg" / GSI_CFG_FILENAME
     removed = uninstall_gsi_cfg(cfg_file)
     _safe_print(
-        f"[OK] Arquivo GSI removido: {cfg_file}"
+        t("cli.gsi_removed", cfg_file=cfg_file)
         if removed
-        else f"[INFO] Nenhum arquivo GSI gerenciado removido em: {cfg_file}"
+        else t("cli.gsi_none_removed", cfg_file=cfg_file)
     )
     return 0
 
@@ -81,6 +83,7 @@ def _run_self_check(config_path: Optional[str]) -> int:
     with tempfile.TemporaryDirectory(prefix="cs2rgbsync_check_") as tmp_dir:
         cfg_file = Path(config_path) if config_path else (Path(tmp_dir) / "config.json")
         cfg_mgr = ConfigManager(user_config_path=cfg_file)
+        set_i18n_language(str(cfg_mgr.get("ui.language", "en_US")))
         token = str(cfg_mgr.get("server.token", ""))
 
         server = GSIServer(host="127.0.0.1", port=0, auth_token=token)
@@ -100,13 +103,13 @@ def _run_self_check(config_path: Optional[str]) -> int:
             )
             with urllib.request.urlopen(req, timeout=3.0) as resp:
                 if resp.status != 200:
-                    _safe_print(f"[ERRO] HTTP status inesperado no GSIServer: {resp.status}")
+                    _safe_print(t("cli.self_check_http_err", status=resp.status))
                     return 3
             last_payload = server.get_last_payload() or {}
             if (last_payload.get("auth") or {}).get("token") != REDACTED_PLACEHOLDER:
-                _safe_print("[ERRO] Token não mascarado no diagnóstico do GSIServer.")
+                _safe_print(t("cli.self_check_redact_err"))
                 return 4
-            _safe_print(f"[OK] GSIServer 127.0.0.1:{port} HTTP 200 + redação validada.")
+            _safe_print(t("cli.self_check_http_ok", port=port))
         finally:
             server.stop()
 
@@ -118,21 +121,24 @@ def _run_self_check(config_path: Optional[str]) -> int:
             if controller.connect(timeout_s=4.0):
                 st = controller.get_status()
                 _safe_print(
-                    f"[OK] iCUE SDK conectado | Dispositivo='{st.device_model}' | LEDs={st.led_ids}"
+                    t(
+                        "cli.self_check_icue_ok",
+                        model=st.device_model,
+                        leds=st.led_ids,
+                    )
                 )
                 controller.release_and_disconnect()
             else:
                 st = controller.get_status()
-                _safe_print(f"[AVISO] iCUE em execução, mas SDK retornou: {st.last_error}")
+                _safe_print(t("cli.self_check_icue_warn", err=st.last_error))
                 controller.release_and_disconnect()
         else:
-            # Garante ao menos o carregamento da DLL nativa empacotada
             from cuesdk import CueSdk
 
             _sdk = CueSdk()
-            _safe_print("[OK] DLL do iCUE SDK carregada (processo iCUE.exe não está aberto).")
+            _safe_print(t("cli.self_check_dll_ok"))
 
-    _safe_print("[OK] Self-check concluído com sucesso.")
+    _safe_print(t("cli.self_check_done"))
     return 0
 
 

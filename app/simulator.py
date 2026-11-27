@@ -1,16 +1,17 @@
 """
-Gerador de cenários simulados do CS2 GSI para testes sem abrir o jogo.
+Simulated CS2 GSI scenario generator for testing effects without launching CS2.
 
-Sempre identifica explicitamente o estado gerado como simulação (`is_simulation=True`),
-nunca apresentando dados simulados como se fossem dados reais de partida.
+Always marks generated payloads with ``_simulation=True`` so simulated data
+is strictly isolated from live match telemetry.
 """
 
 from __future__ import annotations
 
 import copy
 import time
-from typing import Any
+from typing import Any, Optional
 
+from app.i18n import t
 
 WEAPON_PRESETS: dict[str, tuple[str, str, int, int]] = {
     "knife": ("weapon_knife_karambit", "Knife", 0, 0),
@@ -22,9 +23,11 @@ WEAPON_PRESETS: dict[str, tuple[str, str, int, int]] = {
     "grenade": ("weapon_flashbang", "Grenade", 0, 0),
 }
 
+_VALID_ROUND_PHASES = frozenset({"freezetime", "live", "over"})
+
 
 class GSISimulator:
-    """Mantém estado de partida simulado e produz payloads no formato oficial GSI."""
+    """Maintains simulated match state and emits payloads in official CS2 GSI format."""
 
     is_simulation: bool = True
 
@@ -32,6 +35,8 @@ class GSISimulator:
         self._team = "CT"
         self._round_phase = "live"
         self._bomb: str | None = None
+        self._prev_round_phase = "live"
+        self._prev_bomb: str | None = None
         self._health = 100
         self._armor = 100
         self._flashed = 0
@@ -40,14 +45,69 @@ class GSISimulator:
         self._ammo_clip = 30
         self._connected = True
 
+    @property
+    def team(self) -> str:
+        return self._team
+
+    @property
+    def round_phase(self) -> str:
+        return self._round_phase
+
+    @property
+    def bomb(self) -> Optional[str]:
+        return self._bomb
+
+    @property
+    def health(self) -> int:
+        return self._health
+
+    @property
+    def flashed(self) -> int:
+        return self._flashed
+
+    @property
+    def burning(self) -> int:
+        return self._burning
+
+    @property
+    def weapon_key(self) -> str:
+        return self._weapon_key
+
+    @property
+    def ammo_clip(self) -> int:
+        return self._ammo_clip
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    def reset(self) -> dict[str, Any]:
+        """Reset simulated state to clean connected defaults and return baseline payload."""
+        self._team = "CT"
+        self._round_phase = "live"
+        self._bomb = None
+        self._prev_round_phase = "live"
+        self._prev_bomb = None
+        self._health = 100
+        self._armor = 100
+        self._flashed = 0
+        self._burning = 0
+        self._weapon_key = "rifle"
+        self._ammo_clip = 30
+        self._connected = True
+        return self.build_payload()
+
     def set_team(self, team: str) -> dict[str, Any]:
         self._team = "T" if team.upper() in ("T", "TR") else "CT"
         self._connected = True
         return self.build_payload()
 
     def set_round_phase(self, phase: str) -> dict[str, Any]:
-        self._round_phase = phase
-        if phase == "freezetime":
+        normalized = str(phase).strip().lower()
+        if normalized not in _VALID_ROUND_PHASES:
+            normalized = "live"
+        self._round_phase = normalized
+        if normalized == "freezetime":
             self._bomb = None
         self._connected = True
         return self.build_payload()
@@ -69,18 +129,46 @@ class GSISimulator:
 
     def set_bomb(self, bomb_state: str | None) -> dict[str, Any]:
         self._bomb = bomb_state
+        if bomb_state == "planted" and self._round_phase == "freezetime":
+            self._round_phase = "live"
         self._connected = True
         return self.build_payload()
 
     def select_weapon(self, category: str) -> dict[str, Any]:
         key = category.lower()
         if key not in WEAPON_PRESETS:
-            raise ValueError(f"Categoria de arma simulada desconhecida: {category}")
+            raise ValueError(t("errors.unknown_weapon_cat", category=category))
         self._weapon_key = key
         _, _, clip, _ = WEAPON_PRESETS[key]
         self._ammo_clip = clip
         self._connected = True
         return self.build_payload()
+
+    def prepare_shot_baseline(self) -> Optional[dict[str, Any]]:
+        """
+        Ensure simulator state is valid for a real ammo_clip drop before firing.
+
+        Returns a baseline payload if weapon, health, round phase, or magazine had
+        to be prepared first; otherwise returns None.
+        """
+        needs_baseline = False
+        self._connected = True
+        if self._round_phase != "live":
+            self._round_phase = "live"
+            needs_baseline = True
+        if self._health <= 0:
+            self._health = 100
+            needs_baseline = True
+        if self._weapon_key in ("knife", "grenade"):
+            self._weapon_key = "rifle"
+            self._ammo_clip = 30
+            needs_baseline = True
+        elif self._ammo_clip <= 0:
+            _, _, clip_max, _ = WEAPON_PRESETS[self._weapon_key]
+            self._ammo_clip = max(2, clip_max)
+            needs_baseline = True
+
+        return self.build_payload() if needs_baseline else None
 
     def trigger_shot(self) -> dict[str, Any]:
         self._connected = True
@@ -107,11 +195,17 @@ class GSISimulator:
             weapon_entry["ammo_reserve"] = 90
 
         round_block: dict[str, Any] = {"phase": self._round_phase}
-        previously: dict[str, Any] = {}
+        prev_round: dict[str, Any] = {}
         if self._bomb is not None:
             round_block["bomb"] = self._bomb
-        else:
-            previously = {"round": {"bomb": "planted"}}
+        elif self._prev_bomb is not None:
+            prev_round["bomb"] = self._prev_bomb
+        if self._prev_round_phase != self._round_phase:
+            prev_round["phase"] = self._prev_round_phase
+
+        previously: dict[str, Any] = {"round": prev_round} if prev_round else {}
+        self._prev_bomb = self._bomb
+        self._prev_round_phase = self._round_phase
 
         return copy.deepcopy(
             {
@@ -126,7 +220,7 @@ class GSISimulator:
                 "phase_countdowns": {"phase": self._round_phase},
                 "player": {
                     "steamid": "76561198000000001",
-                    "name": "Simulacao",
+                    "name": "Simulation",
                     "activity": "playing",
                     "team": self._team,
                     "state": {

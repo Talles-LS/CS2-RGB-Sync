@@ -100,6 +100,7 @@
     }
   },
   "ui": {
+    "language": "en_US",
     "start_with_windows": false,
     "minimize_to_tray": true,
     "auto_start_integration": false
