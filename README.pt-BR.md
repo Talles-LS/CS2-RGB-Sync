@@ -9,9 +9,11 @@
     <code>Interface Obsidian Calibre</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.2.0</code>
   </p>
   <p>
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.2.0"><strong>Notas da Release v0.2.0 &amp; Checksums</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe"><strong>Baixar Instalador (CS2RGBSync_Setup_v0.2.0.exe)</strong></a>
     &nbsp;|&nbsp;
-    <a href="docs/INSTALLATION.md"><strong>Guia de Instalação e Execução via Fonte</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Portable_v0.2.0.zip"><strong>Baixar Versão Portátil (v0.2.0 .zip)</strong></a>
+    &nbsp;|&nbsp;
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.2.0">Notas da Release &amp; SHA-256</a>
   </p>
 </div>
 
@@ -91,14 +93,14 @@ Observações importantes:
 
 ### Opção A: Instalador Windows (`CS2RGBSync_Setup_v0.2.0.exe`)
 
-1. Gere localmente via `build.bat` / Inno Setup (`release-artifacts/CS2RGBSync_Setup_v0.2.0.exe`). *(Os binários públicos da `v0.2.0` ficam retidos até confirmação dos termos públicos de redistribuição da `iCUESDK.x64_2019.dll` da Corsair; consulte [`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt).)*
+1. Baixe [`CS2RGBSync_Setup_v0.2.0.exe`](https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe) na página de Releases do GitHub.
 2. Execute o instalador e selecione as opções desejadas (atalho na Área de Trabalho, iniciar com o Windows em `--minimized`, configuração automática do GSI).
 3. Se a configuração GSI estiver marcada, confirme a pasta detectada do CS2 (`...\Counter-Strike Global Offensive\game\csgo`) ou selecione-a manualmente.
 4. Conclua a instalação e abra o **CS2 RGB Sync**.
 
 ### Opção B: Versão Portátil (`CS2RGBSync_Portable_v0.2.0.zip`)
 
-1. Extraia o arquivo ZIP **completo** compilado localmente preservando a estrutura da pasta `CS2RGBSync\` (`CS2RGBSync.exe` ao lado de `_internal\`). Não separe o `.exe` da pasta `_internal`.
+1. Baixe [`CS2RGBSync_Portable_v0.2.0.zip`](https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Portable_v0.2.0.zip) e extraia o arquivo ZIP **completo** preservando a estrutura da pasta `CS2RGBSync\` (`CS2RGBSync.exe` ao lado de `_internal\`). Não separe o `.exe` da pasta `_internal`.
 2. Execute `CS2RGBSync.exe` (não exige Python instalado).
 3. Acesse **Settings** (*Configurações*) -> opcionalmente troque o idioma em **01 · Language** -> **Detect Steam** (ou **Browse Folder...**) -> **Install / Update GSI File**.
 
