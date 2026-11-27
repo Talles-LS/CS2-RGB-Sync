@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.i18n import t
+
 # Tokens de cor Obsidian Calibre
 PALETTE = {
     "bg_void": "#08090B",
@@ -267,6 +269,58 @@ QPushButton#AccentBlue:hover {
     background-color: #162B45;
     border-color: #4B9BFF;
     color: #A4CFFF;
+}
+
+QPushButton#LanguageButton {
+    background-color: #0E1014;
+    border: 1px solid #252A34;
+    border-radius: 4px;
+    padding: 6px 12px;
+    color: #F2F4F7;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+
+QPushButton#LanguageButton:hover {
+    background-color: #14171D;
+    border-color: #3D4556;
+}
+
+QPushButton#LanguageButton:pressed {
+    background-color: #1A1F28;
+    border-color: #FF6B1A;
+}
+
+QMenu {
+    background-color: #11141A;
+    border: 1px solid #252A34;
+    border-radius: 4px;
+    padding: 4px;
+    color: #D4D8DF;
+    font-size: 12.5px;
+}
+
+QMenu::item {
+    padding: 7px 26px 7px 14px;
+    border-radius: 3px;
+}
+
+QMenu::item:selected {
+    background-color: #1B202A;
+    color: #F2F4F7;
+}
+
+QMenu::indicator {
+    width: 10px;
+    height: 10px;
+    margin-left: 8px;
+}
+
+QMenu::indicator:checked {
+    background-color: #FF6B1A;
+    border: 1px solid #FF8A47;
+    border-radius: 5px;
 }
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QListWidget {
@@ -601,7 +655,10 @@ class StatusCard(QFrame):
         self.detail_label.setStyleSheet("color: #6E7685; font-size: 11.5px;")
         layout.addWidget(self.detail_label)
 
-        self.set_status("Inativo", "neutral", "-")
+        self.set_status("Inactive", "neutral", "-")
+
+    def set_title(self, title: str) -> None:
+        self.title_label.setText(title.upper())
 
     def set_status(
         self, status_text: str, level: str = "neutral", detail: str = ""
@@ -854,7 +911,9 @@ class ColorPickerButton(QWidget):
         )
 
     def _choose_color(self) -> None:
-        chosen = QColorDialog.getColor(QColor(self._hex), self, "Selecionar Cor RGB")
+        chosen = QColorDialog.getColor(
+            QColor(self._hex), self, t("dialogs.choose_rgb_color")
+        )
         if chosen.isValid():
             self.set_color(chosen.name().upper())
             self.colorChanged.emit(self._hex)

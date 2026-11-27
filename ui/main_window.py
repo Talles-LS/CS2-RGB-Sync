@@ -1,4 +1,4 @@
-"""Janela principal do CS2 RGB Sync com identidade visual Obsidian Calibre."""
+"""Main desktop window for CS2 RGB Sync with Obsidian Calibre styling and live i18n."""
 
 from __future__ import annotations
 
@@ -24,6 +24,11 @@ from PySide6.QtWidgets import (
 
 from app import __app_name__, __version__
 from app.config_manager import get_project_root
+from app.i18n import (
+    subscribe_language_changed,
+    t,
+    unsubscribe_language_changed,
+)
 from app.sync_service import SyncService
 from ui.dashboard import DashboardPage
 from ui.diagnostics_page import DiagnosticsPage
@@ -40,16 +45,26 @@ def _h_divider() -> QFrame:
     return line
 
 
+_NAV_ITEMS = (
+    ("nav.dashboard", "dashboard"),
+    ("nav.effects", "effects"),
+    ("nav.settings", "settings"),
+    ("nav.diagnostics", "diagnostics"),
+)
+
+
 class MainWindow(QMainWindow):
-    """Janela desktop principal com navegação lateral minimalista, tray e atualização assíncrona."""
+    """Main desktop window with Obsidian Rail navigation, system tray, and live i18n."""
 
     _integrationActionDone = Signal(bool, str, bool)
+    _languageChangedSignal = Signal(str)
 
     def __init__(self, service: SyncService, start_minimized: bool = False) -> None:
         super().__init__()
         self._service = service
         self._force_quit = False
         self._action_in_flight = False
+        self._custom_footer_status = False
 
         self.setWindowTitle(__app_name__)
         self.resize(1140, 720)
@@ -67,6 +82,8 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._setup_tray(icon_path)
         self._integrationActionDone.connect(self._on_integration_action_done)
+        self._languageChangedSignal.connect(self._on_language_changed_ui)
+        subscribe_language_changed(self._emit_language_changed)
 
         try:
             apply_windows_dark_titlebar(int(self.winId()))
@@ -77,13 +94,22 @@ class MainWindow(QMainWindow):
         self._refresh_timer.setInterval(100)
         self._refresh_timer.timeout.connect(self._refresh_ui)
         self._refresh_timer.start()
-        self._refresh_ui()
+        self.retranslate_ui()
 
         if self._service.get_config().get("ui", {}).get("auto_start_integration", False):
             QTimer.singleShot(250, self._trigger_toggle_integration)
 
         if start_minimized and self._tray is not None:
             self.hide()
+
+    def _emit_language_changed(self, lang_code: str) -> None:
+        try:
+            self._languageChangedSignal.emit(lang_code)
+        except RuntimeError:
+            pass
+
+    def _on_language_changed_ui(self, _lang_code: str) -> None:
+        self.retranslate_ui()
 
     @staticmethod
     def _find_icon_path() -> Path | None:
@@ -109,7 +135,7 @@ class MainWindow(QMainWindow):
         main_lay.setContentsMargins(0, 0, 0, 0)
         main_lay.setSpacing(0)
 
-        # Barra lateral Obsidian Rail (208px)
+        # Obsidian Rail sidebar (208px)
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
         sidebar.setFixedWidth(208)
@@ -117,7 +143,6 @@ class MainWindow(QMainWindow):
         side_lay.setContentsMargins(14, 18, 14, 16)
         side_lay.setSpacing(6)
 
-        # Lockup de marca com Optical Reticle vetorial
         brand_row = QHBoxLayout()
         brand_row.setContentsMargins(4, 2, 4, 12)
         brand_row.setSpacing(10)
@@ -129,10 +154,10 @@ class MainWindow(QMainWindow):
         lbl_title = QLabel('CS2 <span style="color:#FF6B1A;">SYNC</span>')
         lbl_title.setObjectName("AppTitle")
         lbl_title.setTextFormat(Qt.TextFormat.RichText)
-        lbl_sub = QLabel("CORSAIR iCUE RGB")
-        lbl_sub.setObjectName("AppSubtitle")
+        self._lbl_brand_sub = QLabel(t("nav.brand_subtitle"))
+        self._lbl_brand_sub.setObjectName("AppSubtitle")
         brand_text_col.addWidget(lbl_title)
-        brand_text_col.addWidget(lbl_sub)
+        brand_text_col.addWidget(self._lbl_brand_sub)
         brand_row.addLayout(brand_text_col, 1)
         side_lay.addLayout(brand_row)
 
@@ -140,14 +165,8 @@ class MainWindow(QMainWindow):
         side_lay.addSpacing(8)
 
         self.nav_buttons: list[QPushButton] = []
-        nav_items = (
-            ("Painel", "dashboard"),
-            ("Efeitos RGB", "effects"),
-            ("Configurações", "settings"),
-            ("Diagnóstico", "diagnostics"),
-        )
-        for idx, (text, icon_kind) in enumerate(nav_items):
-            btn = QPushButton(text)
+        for idx, (label_key, icon_kind) in enumerate(_NAV_ITEMS):
+            btn = QPushButton(t(label_key))
             btn.setObjectName("NavButton")
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -167,7 +186,7 @@ class MainWindow(QMainWindow):
         self._footer_dot = QLabel()
         self._footer_dot.setFixedSize(7, 7)
         self._footer_dot.setStyleSheet("background-color: #4E5563; border-radius: 3px;")
-        self.lbl_footer_status = QLabel("Pronto")
+        self.lbl_footer_status = QLabel(t("common.ready"))
         self.lbl_footer_status.setWordWrap(True)
         self.lbl_footer_status.setStyleSheet("color: #B8BFC9; font-size: 11.5px;")
         footer_row.addWidget(self._footer_dot, 0, Qt.AlignmentFlag.AlignTop)
@@ -181,7 +200,6 @@ class MainWindow(QMainWindow):
         side_lay.addWidget(self.lbl_version_meta)
         main_lay.addWidget(sidebar)
 
-        # Páginas
         self.stack = QStackedWidget()
         self.dashboard_page = DashboardPage(self._service)
         self.effects_page = EffectsPage(self._service)
@@ -214,21 +232,43 @@ class MainWindow(QMainWindow):
         tray.setToolTip(__app_name__)
 
         menu = QMenu(self)
-        act_open = QAction("Abrir Painel", self)
-        act_open.triggered.connect(self._restore_from_tray)
-        self._tray_toggle_action = QAction("Iniciar Integração", self)
+        self._tray_open_action = QAction(t("tray.open_dashboard"), self)
+        self._tray_open_action.triggered.connect(self._restore_from_tray)
+        self._tray_toggle_action = QAction(t("tray.start_integration"), self)
         self._tray_toggle_action.triggered.connect(self._trigger_toggle_integration)
-        act_quit = QAction("Sair", self)
-        act_quit.triggered.connect(self._quit_app)
+        self._tray_quit_action = QAction(t("tray.quit"), self)
+        self._tray_quit_action.triggered.connect(self._quit_app)
 
-        menu.addAction(act_open)
+        menu.addAction(self._tray_open_action)
         menu.addAction(self._tray_toggle_action)
         menu.addSeparator()
-        menu.addAction(act_quit)
+        menu.addAction(self._tray_quit_action)
         tray.setContextMenu(menu)
         tray.activated.connect(self._on_tray_activated)
         tray.show()
         self._tray = tray
+
+    def retranslate_ui(self) -> None:
+        self.setWindowTitle(__app_name__)
+        self._lbl_brand_sub.setText(t("nav.brand_subtitle"))
+        for btn, (label_key, _icon_kind) in zip(self.nav_buttons, _NAV_ITEMS):
+            btn.setText(t(label_key))
+
+        if not self._custom_footer_status:
+            self.lbl_footer_status.setText(t("common.ready"))
+
+        if self._tray is not None:
+            self._tray.setToolTip(__app_name__)
+        if hasattr(self, "_tray_open_action"):
+            self._tray_open_action.setText(t("tray.open_dashboard"))
+        if hasattr(self, "_tray_quit_action"):
+            self._tray_quit_action.setText(t("tray.quit"))
+
+        self.dashboard_page.retranslate_ui()
+        self.effects_page.retranslate_ui()
+        self.settings_page.retranslate_ui()
+        self.diagnostics_page.retranslate_ui()
+        self._refresh_ui()
 
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason in (
@@ -253,6 +293,7 @@ class MainWindow(QMainWindow):
         self._refresh_ui()
 
     def _set_footer_status(self, message: str) -> None:
+        self._custom_footer_status = True
         self.lbl_footer_status.setText(message)
 
     def _trigger_toggle_integration(self) -> None:
@@ -261,13 +302,20 @@ class MainWindow(QMainWindow):
         self._action_in_flight = True
         currently_running = self._service.get_ui_snapshot().integration_running
         self.dashboard_page.set_busy(
-            True, "PARANDO..." if currently_running else "INICIANDO..."
+            True,
+            text_key=(
+                "dashboard.stopping_btn"
+                if currently_running
+                else "dashboard.starting_btn"
+            ),
         )
 
         def worker() -> None:
             if currently_running:
                 self._service.stop_integration()
-                self._integrationActionDone.emit(True, "Integração encerrada.", False)
+                self._integrationActionDone.emit(
+                    True, t("dashboard.integration_stopped_status"), False
+                )
             else:
                 ok, msg = self._service.start_integration()
                 self._integrationActionDone.emit(ok, msg, True)
@@ -280,10 +328,12 @@ class MainWindow(QMainWindow):
         self._set_footer_status(msg)
         if hasattr(self, "_tray_toggle_action"):
             self._tray_toggle_action.setText(
-                "Parar Integração" if (ok and was_start) else "Iniciar Integração"
+                t("tray.stop_integration")
+                if (ok and was_start)
+                else t("tray.start_integration")
             )
         if not ok and was_start:
-            QMessageBox.warning(self, "Erro ao Iniciar Integração", msg)
+            QMessageBox.warning(self, t("dialogs.start_integration_err_title"), msg)
         self._refresh_ui()
 
     def _refresh_ui(self) -> None:
@@ -301,7 +351,9 @@ class MainWindow(QMainWindow):
         )
         if hasattr(self, "_tray_toggle_action"):
             self._tray_toggle_action.setText(
-                "Parar Integração" if snap.integration_running else "Iniciar Integração"
+                t("tray.stop_integration")
+                if snap.integration_running
+                else t("tray.start_integration")
             )
 
     def _quit_app(self) -> None:
@@ -312,7 +364,8 @@ class MainWindow(QMainWindow):
             app.quit()
 
     def shutdown_service(self) -> None:
-        """Encerra timer, tray e serviço com segurança."""
+        """Stop timers, tray, language subscription, and service safely."""
+        unsubscribe_language_changed(self._emit_language_changed)
         self._refresh_timer.stop()
         if self._tray is not None:
             self._tray.hide()
@@ -327,7 +380,7 @@ class MainWindow(QMainWindow):
             self.hide()
             self._tray.showMessage(
                 __app_name__,
-                "CS2 RGB Sync continua ativo na bandeja do sistema.",
+                t("tray.minimized_notice"),
                 QSystemTrayIcon.MessageIcon.Information,
                 2000,
             )

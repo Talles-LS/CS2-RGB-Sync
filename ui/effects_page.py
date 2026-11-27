@@ -1,4 +1,4 @@
-"""Aba Master-Detail Studio para efeitos RGB e hierarquia de prioridades."""
+"""Master-Detail Studio tab for RGB effects and priority hierarchy."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.i18n import t
 from app.sync_service import SyncService
 from ui.theme import ColorPickerButton, EffectSignatureBar, ToggleSwitch
 
@@ -36,58 +37,69 @@ _DEFAULT_PRIORITY_IDS = [
 
 _GROUP_META: dict[str, dict[str, Any]] = {
     "flashbang": {
-        "title": "Flashbang",
-        "desc": "Clarão proporcional à cegueira real",
+        "title_key": "effects.groups.flashbang.title",
+        "desc_key": "effects.groups.flashbang.desc",
         "priority_keys": ["flashbang"],
         "sig_mode": "fade",
     },
     "shot": {
-        "title": "Disparos",
-        "desc": "Pulso curto via ammo_clip",
+        "title_key": "effects.groups.shot.title",
+        "desc_key": "effects.groups.shot.desc",
         "priority_keys": ["shot"],
         "sig_mode": "pulse",
     },
     "fire": {
-        "title": "Dano de Fogo",
-        "desc": "Oscilação térmica · acima da C4",
+        "title_key": "effects.groups.fire.title",
+        "desc_key": "effects.groups.fire.desc",
         "priority_keys": ["fire"],
         "sig_mode": "gradient",
     },
     "c4": {
-        "title": "C4 Plantada",
-        "desc": "Bipes acelerando até 40 s",
+        "title_key": "effects.groups.c4.title",
+        "desc_key": "effects.groups.c4.desc",
         "priority_keys": ["c4"],
         "sig_mode": "beeps",
     },
     "health": {
-        "title": "Vida & Vida Crítica",
-        "desc": "Gradiente de HP e alerta crítico",
+        "title_key": "effects.groups.health.title",
+        "desc_key": "effects.groups.health.desc",
         "priority_keys": ["health_critical", "health"],
         "sig_mode": "gradient",
     },
     "team_round": {
-        "title": "Freezetime (CT / TR)",
-        "desc": "Cores CT / TR exclusivamente no Freezetime",
+        "title_key": "effects.groups.team_round.title",
+        "desc_key": "effects.groups.team_round.desc",
         "priority_keys": ["team_round"],
         "sig_mode": "segments",
     },
     "weapon": {
-        "title": "Arma Equipada",
-        "desc": "Cor por categoria de arma",
+        "title_key": "effects.groups.weapon.title",
+        "desc_key": "effects.groups.weapon.desc",
         "priority_keys": ["weapon"],
         "sig_mode": "segments",
     },
 }
 
-_WEAPON_LABELS = {
-    "knife": "Facas",
-    "pistol": "Pistolas",
-    "rifle": "Rifles",
-    "sniper": "Snipers",
-    "smg": "SMGs",
-    "shotgun": "Escopetas",
-    "grenade": "Granadas",
-}
+_WEAPON_KEYS = (
+    "knife",
+    "pistol",
+    "rifle",
+    "sniper",
+    "smg",
+    "shotgun",
+    "grenade",
+)
+
+
+def get_group_meta(group_id: str) -> dict[str, Any]:
+    """Return localized title, description, priority_keys, and signature mode."""
+    meta = _GROUP_META[group_id]
+    return {
+        "title": t(meta["title_key"]),
+        "desc": t(meta["desc_key"]),
+        "priority_keys": meta["priority_keys"],
+        "sig_mode": meta["sig_mode"],
+    }
 
 
 def _hline() -> QFrame:
@@ -97,11 +109,13 @@ def _hline() -> QFrame:
 
 
 class _MasterEffectRow(QFrame):
-    """Linha clicável na coluna Master com índice de prioridade, filete colorido e toggle."""
+    """Clickable Master list row with priority rank, color stripe, and toggle."""
 
     clicked = Signal(str)
 
-    def __init__(self, group_id: str, toggle: ToggleSwitch, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, group_id: str, toggle: ToggleSwitch, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.group_id = group_id
         self.toggle = toggle
@@ -125,16 +139,22 @@ class _MasterEffectRow(QFrame):
         text_col = QVBoxLayout()
         text_col.setContentsMargins(0, 0, 0, 0)
         text_col.setSpacing(1)
-        self.lbl_name = QLabel(_GROUP_META[group_id]["title"])
+        self.lbl_name = QLabel()
         self.lbl_name.setStyleSheet("color: #F2F4F7; font-size: 13px; font-weight: 500;")
-        self.lbl_desc = QLabel(_GROUP_META[group_id]["desc"])
+        self.lbl_desc = QLabel()
         self.lbl_desc.setStyleSheet("color: #636B7A; font-size: 11px;")
         text_col.addWidget(self.lbl_name)
         text_col.addWidget(self.lbl_desc)
         lay.addLayout(text_col, 1)
 
         lay.addWidget(toggle)
+        self.retranslate()
         self._apply_row_style()
+
+    def retranslate(self) -> None:
+        meta = get_group_meta(self.group_id)
+        self.lbl_name.setText(meta["title"])
+        self.lbl_desc.setText(meta["desc"])
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         self.clicked.emit(self.group_id)
@@ -170,7 +190,7 @@ class _MasterEffectRow(QFrame):
 
 
 class EffectsPage(QWidget):
-    """Master-Detail Studio: lista ordenável à esquerda e inspetor dedicado à direita."""
+    """Master-Detail Studio: sortable priority list on left and dedicated inspector on right."""
 
     statusMessage = Signal(str)
 
@@ -188,19 +208,28 @@ class EffectsPage(QWidget):
             "weapon",
         ]
         self._selected_group = "flashbang"
+        self._loading = False
         self._weapon_pickers: dict[str, ColorPickerButton] = {}
+        self._weapon_labels: dict[str, QLabel] = {}
         self._rows: dict[str, _MasterEffectRow] = {}
-        self._inspector_headers: dict[str, tuple[QLabel, ToggleSwitch, EffectSignatureBar]] = {}
+        self._inspector_headers: dict[
+            str, tuple[QLabel, QLabel, QLabel, QLabel, ToggleSwitch, EffectSignatureBar]
+        ] = {}
         self._inspector_indices: dict[str, int] = {}
+        self._param_labels: list[tuple[QLabel, str]] = []
+        self._percent_spins: list[QSpinBox] = []
+        self._ms_spins: list[QSpinBox] = []
+        self._s_spins: list[QDoubleSpinBox] = []
+        self._hz_spins: list[QDoubleSpinBox] = []
 
         self._build_ui()
         self.load_from_config(self._service.get_config())
 
-    @staticmethod
-    def _percent_spin() -> QSpinBox:
+    def _percent_spin(self) -> QSpinBox:
         s = QSpinBox()
         s.setRange(0, 100)
-        s.setSuffix(" %")
+        s.setSuffix(t("common.percent_unit"))
+        self._percent_spins.append(s)
         return s
 
     def _build_ui(self) -> None:
@@ -208,7 +237,7 @@ class EffectsPage(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Cabeçalho
+        # Header
         header = QWidget()
         top = QHBoxLayout(header)
         top.setContentsMargins(28, 20, 28, 18)
@@ -216,19 +245,17 @@ class EffectsPage(QWidget):
 
         tcol = QVBoxLayout()
         tcol.setSpacing(2)
-        lbl = QLabel("Efeitos RGB & Prioridades")
-        lbl.setObjectName("PageTitle")
-        sub = QLabel(
-            "Selecione um efeito para ajustar comportamento, cores e prioridade"
-        )
-        sub.setObjectName("PageSubtitle")
-        tcol.addWidget(lbl)
-        tcol.addWidget(sub)
+        self._lbl_title = QLabel()
+        self._lbl_title.setObjectName("PageTitle")
+        self._lbl_subtitle = QLabel()
+        self._lbl_subtitle.setObjectName("PageSubtitle")
+        tcol.addWidget(self._lbl_title)
+        tcol.addWidget(self._lbl_subtitle)
         top.addLayout(tcol, 1)
 
-        self.btn_restore_defaults = QPushButton("Restaurar Padrões")
+        self.btn_restore_defaults = QPushButton()
         self.btn_restore_defaults.clicked.connect(self._on_restore_defaults)
-        self.btn_save = QPushButton("Aplicar e Salvar")
+        self.btn_save = QPushButton()
         self.btn_save.setObjectName("PrimaryAccent")
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.clicked.connect(self._on_save)
@@ -237,12 +264,11 @@ class EffectsPage(QWidget):
         outer.addWidget(header)
         outer.addWidget(_hline())
 
-        # Split Master-Detail
+        # Master-Detail split
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
 
-        # Coluna Master (368px)
         master = QFrame()
         master.setObjectName("MasterPane")
         master.setFixedWidth(368)
@@ -253,17 +279,17 @@ class EffectsPage(QWidget):
         m_head = QWidget()
         mh_lay = QHBoxLayout(m_head)
         mh_lay.setContentsMargins(16, 10, 16, 10)
-        lbl_p = QLabel("ORDEM DE PRIORIDADE (TOPO = MAIOR)")
-        lbl_p.setObjectName("Overline")
-        lbl_a = QLabel("ATIVO")
-        lbl_a.setObjectName("Overline")
-        mh_lay.addWidget(lbl_p)
+        self._lbl_prio_head = QLabel()
+        self._lbl_prio_head.setObjectName("Overline")
+        self._lbl_active_head = QLabel()
+        self._lbl_active_head.setObjectName("Overline")
+        mh_lay.addWidget(self._lbl_prio_head)
         mh_lay.addStretch(1)
-        mh_lay.addWidget(lbl_a)
+        mh_lay.addWidget(self._lbl_active_head)
         m_lay.addWidget(m_head)
         m_lay.addWidget(_hline())
 
-        # Controles toggle por efeito (preservando nomes públicos chk_*)
+        # Toggles (preserving public attributes chk_*)
         self.chk_flash = ToggleSwitch()
         self.chk_shot = ToggleSwitch()
         self.chk_fire = ToggleSwitch()
@@ -309,24 +335,25 @@ class EffectsPage(QWidget):
         mf_lay = QHBoxLayout(m_foot)
         mf_lay.setContentsMargins(16, 10, 16, 10)
         mf_lay.setSpacing(8)
-        lbl_reord = QLabel("Prioridade:")
-        lbl_reord.setStyleSheet("color: #6E7685; font-size: 12px;")
-        btn_up = QPushButton("↑ Subir")
-        btn_up.clicked.connect(lambda: self._move_selected(-1))
-        btn_down = QPushButton("↓ Descer")
-        btn_down.clicked.connect(lambda: self._move_selected(1))
-        mf_lay.addWidget(lbl_reord)
+        self._lbl_reord = QLabel()
+        self._lbl_reord.setStyleSheet("color: #6E7685; font-size: 12px;")
+        self._btn_up = QPushButton()
+        self._btn_up.clicked.connect(lambda: self._move_selected(-1))
+        self._btn_down = QPushButton()
+        self._btn_down.clicked.connect(lambda: self._move_selected(1))
+        mf_lay.addWidget(self._lbl_reord)
         mf_lay.addStretch(1)
-        mf_lay.addWidget(btn_up)
-        mf_lay.addWidget(btn_down)
+        mf_lay.addWidget(self._btn_up)
+        mf_lay.addWidget(self._btn_down)
         m_lay.addWidget(m_foot)
 
         body.addWidget(master)
 
-        # Coluna Inspetor à Direita
         inspector_scroll = QScrollArea()
         inspector_scroll.setWidgetResizable(True)
-        inspector_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        inspector_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         inspector_scroll.viewport().setObjectName("PageCanvas")
         inspector_scroll.viewport().setAutoFillBackground(True)
         self.inspector_stack = QStackedWidget()
@@ -337,8 +364,8 @@ class EffectsPage(QWidget):
 
         outer.addLayout(body, 1)
 
-        # Constroi os 7 painéis de inspeção detalhada
         self._build_all_inspectors()
+        self.retranslate_ui()
         self._select_group("flashbang")
 
     def _build_inspector_shell(
@@ -355,11 +382,11 @@ class EffectsPage(QWidget):
         head_row.setSpacing(16)
         meta_col = QVBoxLayout()
         meta_col.setSpacing(3)
-        lbl_prio = QLabel("PRIORIDADE #01")
+        lbl_prio = QLabel()
         lbl_prio.setObjectName("SectionOverline")
-        lbl_title = QLabel(_GROUP_META[group_id]["title"])
+        lbl_title = QLabel()
         lbl_title.setObjectName("HeroTitle")
-        lbl_desc = QLabel(_GROUP_META[group_id]["desc"])
+        lbl_desc = QLabel()
         lbl_desc.setObjectName("PageSubtitle")
         meta_col.addWidget(lbl_prio)
         meta_col.addWidget(lbl_title)
@@ -378,7 +405,7 @@ class EffectsPage(QWidget):
 
         sig_col = QVBoxLayout()
         sig_col.setSpacing(6)
-        lbl_sig = QLabel("ASSINATURA VISUAL DO EFEITO")
+        lbl_sig = QLabel()
         lbl_sig.setObjectName("Overline")
         sig_bar = EffectSignatureBar()
         sig_col.addWidget(lbl_sig)
@@ -393,25 +420,38 @@ class EffectsPage(QWidget):
         lay.addLayout(params_col)
         lay.addStretch(1)
 
-        self._inspector_headers[group_id] = (lbl_prio, detail_toggle, sig_bar)
+        self._inspector_headers[group_id] = (
+            lbl_prio,
+            lbl_title,
+            lbl_desc,
+            lbl_sig,
+            detail_toggle,
+            sig_bar,
+        )
         return page, params_col, sig_bar
 
-    @staticmethod
     def _add_param_row(
-        container: QVBoxLayout, label: str, widget: QWidget, with_divider: bool = True
-    ) -> None:
+        self,
+        container: QVBoxLayout,
+        label_key: str,
+        widget: QWidget,
+        with_divider: bool = True,
+    ) -> QLabel:
         row = QWidget()
         rlay = QHBoxLayout(row)
         rlay.setContentsMargins(0, 11, 0, 11)
         rlay.setSpacing(16)
-        lbl = QLabel(label)
+        lbl = QLabel()
         lbl.setStyleSheet("color: #A8B0BE; font-size: 13px;")
+        if label_key:
+            self._param_labels.append((lbl, label_key))
         rlay.addWidget(lbl)
         rlay.addStretch(1)
         rlay.addWidget(widget)
         container.addWidget(row)
         if with_divider:
             container.addWidget(_hline())
+        return lbl
 
     def _build_all_inspectors(self) -> None:
         # 1. Flashbang
@@ -420,49 +460,49 @@ class EffectsPage(QWidget):
         self.spin_flash_int = self._percent_spin()
         self.spin_flash_tail = QSpinBox()
         self.spin_flash_tail.setRange(50, 1500)
-        self.spin_flash_tail.setSuffix(" ms")
+        self._ms_spins.append(self.spin_flash_tail)
         self.spin_flash_bin_fade = QSpinBox()
         self.spin_flash_bin_fade.setRange(100, 2500)
-        self.spin_flash_bin_fade.setSuffix(" ms")
-        self._add_param_row(p_lay, "Cor do clarão:", self.col_flash)
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_flash_int)
-        self._add_param_row(p_lay, "Cauda suave (rampa gradual):", self.spin_flash_tail)
+        self._ms_spins.append(self.spin_flash_bin_fade)
+        self._add_param_row(p_lay, "effects.params.flash_color", self.col_flash)
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_flash_int)
+        self._add_param_row(p_lay, "effects.params.flash_tail", self.spin_flash_tail)
         self._add_param_row(
-            p_lay, "Decaimento pós-cegueira (modo binário):", self.spin_flash_bin_fade, False
+            p_lay, "effects.params.flash_binary_fade", self.spin_flash_bin_fade, False
         )
         self.col_flash.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self._inspector_indices["flashbang"] = self.inspector_stack.addWidget(page)
 
-        # 2. Disparos
+        # 2. Shot
         page, p_lay, _ = self._build_inspector_shell("shot", self.chk_shot)
         self.col_shot = ColorPickerButton("#FF9900")
         self.spin_shot_dur = QSpinBox()
         self.spin_shot_dur.setRange(20, 500)
-        self.spin_shot_dur.setSuffix(" ms")
+        self._ms_spins.append(self.spin_shot_dur)
         self.spin_shot_deb = QSpinBox()
         self.spin_shot_deb.setRange(0, 500)
-        self.spin_shot_deb.setSuffix(" ms")
+        self._ms_spins.append(self.spin_shot_deb)
         self.spin_shot_int = self._percent_spin()
-        self._add_param_row(p_lay, "Cor do pulso:", self.col_shot)
-        self._add_param_row(p_lay, "Duração do pulso:", self.spin_shot_dur)
-        self._add_param_row(p_lay, "Debounce mínimo:", self.spin_shot_deb)
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_shot_int, False)
+        self._add_param_row(p_lay, "effects.params.shot_color", self.col_shot)
+        self._add_param_row(p_lay, "effects.params.shot_duration", self.spin_shot_dur)
+        self._add_param_row(p_lay, "effects.params.shot_debounce", self.spin_shot_deb)
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_shot_int, False)
         self.col_shot.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self._inspector_indices["shot"] = self.inspector_stack.addWidget(page)
 
-        # 3. Fogo
+        # 3. Fire
         page, p_lay, _ = self._build_inspector_shell("fire", self.chk_fire)
         self.col_fire_1 = ColorPickerButton("#FF2200")
         self.col_fire_2 = ColorPickerButton("#FF9900")
         self.spin_fire_hz = QDoubleSpinBox()
         self.spin_fire_hz.setRange(0.5, 15.0)
         self.spin_fire_hz.setSingleStep(0.5)
-        self.spin_fire_hz.setSuffix(" Hz")
+        self._hz_spins.append(self.spin_fire_hz)
         self.spin_fire_int = self._percent_spin()
-        self._add_param_row(p_lay, "Cor primária:", self.col_fire_1)
-        self._add_param_row(p_lay, "Cor secundária:", self.col_fire_2)
-        self._add_param_row(p_lay, "Frequência da oscilação:", self.spin_fire_hz)
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_fire_int, False)
+        self._add_param_row(p_lay, "effects.params.fire_primary", self.col_fire_1)
+        self._add_param_row(p_lay, "effects.params.fire_secondary", self.col_fire_2)
+        self._add_param_row(p_lay, "effects.params.fire_hz", self.spin_fire_hz)
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_fire_int, False)
         self.col_fire_1.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self.col_fire_2.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self._inspector_indices["fire"] = self.inspector_stack.addWidget(page)
@@ -472,52 +512,51 @@ class EffectsPage(QWidget):
         self.col_c4 = ColorPickerButton("#FF0000")
         self.spin_c4_timer = QDoubleSpinBox()
         self.spin_c4_timer.setRange(10.0, 90.0)
-        self.spin_c4_timer.setSuffix(" s")
+        self._s_spins.append(self.spin_c4_timer)
         self.spin_c4_init_int = QDoubleSpinBox()
         self.spin_c4_init_int.setRange(0.20, 3.0)
         self.spin_c4_init_int.setSingleStep(0.05)
-        self.spin_c4_init_int.setSuffix(" s")
+        self._s_spins.append(self.spin_c4_init_int)
         self.spin_c4_min_int = QDoubleSpinBox()
         self.spin_c4_min_int.setRange(0.08, 1.0)
         self.spin_c4_min_int.setSingleStep(0.01)
-        self.spin_c4_min_int.setSuffix(" s")
+        self._s_spins.append(self.spin_c4_min_int)
         self.spin_c4_beep_dur = QDoubleSpinBox()
         self.spin_c4_beep_dur.setRange(0.08, 0.8)
         self.spin_c4_beep_dur.setSingleStep(0.02)
-        self.spin_c4_beep_dur.setSuffix(" s")
+        self._s_spins.append(self.spin_c4_beep_dur)
         self.spin_c4_int = self._percent_spin()
-        self._add_param_row(p_lay, "Cor da bipada:", self.col_c4)
-        self._add_param_row(p_lay, "Tempo estimado da bomba:", self.spin_c4_timer)
-        self._add_param_row(p_lay, "Intervalo inicial:", self.spin_c4_init_int)
-        self._add_param_row(p_lay, "Intervalo mínimo:", self.spin_c4_min_int)
-        self._add_param_row(p_lay, "Duração da bipada:", self.spin_c4_beep_dur)
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_c4_int, False)
+        self._add_param_row(p_lay, "effects.params.c4_color", self.col_c4)
+        self._add_param_row(p_lay, "effects.params.c4_timer", self.spin_c4_timer)
+        self._add_param_row(p_lay, "effects.params.c4_init_int", self.spin_c4_init_int)
+        self._add_param_row(p_lay, "effects.params.c4_min_int", self.spin_c4_min_int)
+        self._add_param_row(p_lay, "effects.params.c4_beep_dur", self.spin_c4_beep_dur)
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_c4_int, False)
         self.col_c4.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self._inspector_indices["c4"] = self.inspector_stack.addWidget(page)
 
-        # 5. Vida & Vida Crítica
+        # 5. Health & Critical Health
         page, p_lay, _ = self._build_inspector_shell("health", self.chk_health)
         self.spin_hp_crit_thresh = QSpinBox()
         self.spin_hp_crit_thresh.setRange(5, 50)
-        self.spin_hp_crit_thresh.setSuffix(" HP")
         self.spin_hp_crit_hz = QDoubleSpinBox()
         self.spin_hp_crit_hz.setRange(0.5, 10.0)
         self.spin_hp_crit_hz.setSingleStep(0.5)
-        self.spin_hp_crit_hz.setSuffix(" Hz")
+        self._hz_spins.append(self.spin_hp_crit_hz)
         self.col_hp_100 = ColorPickerButton("#00FF00")
         self.col_hp_75 = ColorPickerButton("#80FF00")
         self.col_hp_50 = ColorPickerButton("#FFFF00")
         self.col_hp_25 = ColorPickerButton("#FF9900")
         self.col_hp_crit = ColorPickerButton("#FF0000")
         self.spin_hp_int = self._percent_spin()
-        self._add_param_row(p_lay, "Limiar crítico:", self.spin_hp_crit_thresh)
-        self._add_param_row(p_lay, "Frequência do pulso crítico:", self.spin_hp_crit_hz)
-        self._add_param_row(p_lay, "Cor em 100 HP:", self.col_hp_100)
-        self._add_param_row(p_lay, "Cor em 75 HP:", self.col_hp_75)
-        self._add_param_row(p_lay, "Cor em 50 HP:", self.col_hp_50)
-        self._add_param_row(p_lay, "Cor em 25 HP:", self.col_hp_25)
-        self._add_param_row(p_lay, "Cor em estado crítico:", self.col_hp_crit)
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_hp_int, False)
+        self._add_param_row(p_lay, "effects.params.hp_crit_thresh", self.spin_hp_crit_thresh)
+        self._add_param_row(p_lay, "effects.params.hp_crit_hz", self.spin_hp_crit_hz)
+        self._add_param_row(p_lay, "effects.params.hp_100", self.col_hp_100)
+        self._add_param_row(p_lay, "effects.params.hp_75", self.col_hp_75)
+        self._add_param_row(p_lay, "effects.params.hp_50", self.col_hp_50)
+        self._add_param_row(p_lay, "effects.params.hp_25", self.col_hp_25)
+        self._add_param_row(p_lay, "effects.params.hp_crit_col", self.col_hp_crit)
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_hp_int, False)
         for cp in (
             self.col_hp_100,
             self.col_hp_75,
@@ -528,7 +567,7 @@ class EffectsPage(QWidget):
             cp.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self._inspector_indices["health"] = self.inspector_stack.addWidget(page)
 
-        # 6. Freezetime (CT / TR)
+        # 6. Freezetime (CT / T)
         page, p_lay, _ = self._build_inspector_shell("team_round", self.chk_team)
         self.chk_freezetime_pulse = ToggleSwitch()
         self.col_t = ColorPickerButton("#FF9900")
@@ -536,30 +575,80 @@ class EffectsPage(QWidget):
         self.spin_freeze_hz = QDoubleSpinBox()
         self.spin_freeze_hz.setRange(0.2, 5.0)
         self.spin_freeze_hz.setSingleStep(0.1)
-        self.spin_freeze_hz.setSuffix(" Hz")
+        self._hz_spins.append(self.spin_freeze_hz)
         self.spin_team_int = self._percent_spin()
-        self._add_param_row(p_lay, "Cor TR (Freezetime):", self.col_t)
-        self._add_param_row(p_lay, "Cor CT (Freezetime):", self.col_ct)
-        self._add_param_row(p_lay, "Pulsar suavemente no Freezetime:", self.chk_freezetime_pulse)
-        self._add_param_row(p_lay, "Frequência do pulso no Freezetime:", self.spin_freeze_hz)
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_team_int, False)
+        self._add_param_row(p_lay, "effects.params.team_t_col", self.col_t)
+        self._add_param_row(p_lay, "effects.params.team_ct_col", self.col_ct)
+        self._add_param_row(
+            p_lay, "effects.params.team_pulse", self.chk_freezetime_pulse
+        )
+        self._add_param_row(p_lay, "effects.params.team_pulse_hz", self.spin_freeze_hz)
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_team_int, False)
         self.col_t.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self.col_ct.colorChanged.connect(lambda _: self._refresh_visual_indicators())
         self._inspector_indices["team_round"] = self.inspector_stack.addWidget(page)
 
-        # 7. Armas
+        # 7. Weapons
         page, p_lay, _ = self._build_inspector_shell("weapon", self.chk_weapons)
         self.spin_weapons_int = self._percent_spin()
-        self._add_param_row(p_lay, "Intensidade (%):", self.spin_weapons_int)
-        cat_keys = list(_WEAPON_LABELS.items())
-        for idx, (key, label) in enumerate(cat_keys):
+        self._add_param_row(p_lay, "effects.params.intensity", self.spin_weapons_int)
+        for idx, key in enumerate(_WEAPON_KEYS):
             picker = ColorPickerButton("#CCCCCC")
             picker.colorChanged.connect(lambda _: self._refresh_visual_indicators())
             self._weapon_pickers[key] = picker
-            self._add_param_row(
-                p_lay, f"Categoria · {label}:", picker, with_divider=idx < len(cat_keys) - 1
+            lbl = self._add_param_row(
+                p_lay, "", picker, with_divider=idx < len(_WEAPON_KEYS) - 1
             )
+            self._weapon_labels[key] = lbl
         self._inspector_indices["weapon"] = self.inspector_stack.addWidget(page)
+
+    def retranslate_ui(self) -> None:
+        self._lbl_title.setText(t("effects.title"))
+        self._lbl_subtitle.setText(t("effects.subtitle"))
+        self.btn_restore_defaults.setText(t("effects.btn_restore"))
+        self.btn_save.setText(t("effects.btn_save"))
+
+        self._lbl_prio_head.setText(t("effects.priority_header"))
+        self._lbl_active_head.setText(t("effects.active_header"))
+        self._lbl_reord.setText(t("effects.priority_label"))
+        self._btn_up.setText(t("effects.btn_up"))
+        self._btn_down.setText(t("effects.btn_down"))
+
+        for row in self._rows.values():
+            row.retranslate()
+
+        for gid, (
+            _lbl_prio,
+            lbl_title,
+            lbl_desc,
+            lbl_sig,
+            _dt,
+            _sig_bar,
+        ) in self._inspector_headers.items():
+            meta = get_group_meta(gid)
+            lbl_title.setText(meta["title"])
+            lbl_desc.setText(meta["desc"])
+            lbl_sig.setText(t("effects.signature_label"))
+
+        for lbl, key in self._param_labels:
+            lbl.setText(t(key))
+
+        for key, lbl in self._weapon_labels.items():
+            lbl.setText(
+                t("effects.params.category_fmt", label=t(f"effects.weapons.{key}"))
+            )
+
+        for sp in self._percent_spins:
+            sp.setSuffix(t("common.percent_unit"))
+        for sp in self._ms_spins:
+            sp.setSuffix(t("common.ms_unit"))
+        for sp in self._s_spins:
+            sp.setSuffix(t("common.s_unit"))
+        for sp in self._hz_spins:
+            sp.setSuffix(t("common.hz_unit"))
+        self.spin_hp_crit_thresh.setSuffix(t("common.hp_unit"))
+
+        self._refresh_visual_indicators()
 
     @staticmethod
     def _sync_toggle_pair(target: ToggleSwitch, checked: bool) -> None:
@@ -569,6 +658,8 @@ class EffectsPage(QWidget):
             target.blockSignals(False)
 
     def _on_master_toggle_changed(self, group_id: str) -> None:
+        if self._loading:
+            return
         self._refresh_visual_indicators()
         self._select_group(group_id)
 
@@ -650,7 +741,7 @@ class EffectsPage(QWidget):
             ),
             "weapon": (
                 self.chk_weapons.isChecked(),
-                [self._weapon_pickers[k].color() for k in _WEAPON_LABELS],
+                [self._weapon_pickers[k].color() for k in _WEAPON_KEYS],
             ),
         }
         for rank, gid in enumerate(self._group_order, start=1):
@@ -658,77 +749,83 @@ class EffectsPage(QWidget):
             row = self._rows[gid]
             row.set_rank(rank)
             row.set_stripe_color(cols[0], enabled)
-            lbl_prio, detail_toggle, sig_bar = self._inspector_headers[gid]
-            lbl_prio.setText(f"PRIORIDADE #{rank:02d}")
+            lbl_prio, _lt, _ld, _ls, detail_toggle, sig_bar = self._inspector_headers[gid]
+            lbl_prio.setText(t("effects.inspector_priority_fmt", rank=rank))
             self._sync_toggle_pair(detail_toggle, enabled)
             sig_bar.set_signature(_GROUP_META[gid]["sig_mode"], cols, enabled)
 
     def load_from_config(self, cfg: dict[str, Any]) -> None:
-        eff = cfg.get("effects", {})
+        self._loading = True
+        try:
+            eff = cfg.get("effects", {})
 
-        fl = eff.get("flashbang", {})
-        self.chk_flash.setChecked(bool(fl.get("enabled", True)))
-        self.col_flash.set_color(str(fl.get("color", "#FFFFFF")))
-        self.spin_flash_int.setValue(int(fl.get("intensity", 100)))
-        self.spin_flash_tail.setValue(int(fl.get("fade_tail_ms", 220)))
-        self.spin_flash_bin_fade.setValue(int(fl.get("binary_fade_ms", 650)))
+            fl = eff.get("flashbang", {})
+            self.chk_flash.setChecked(bool(fl.get("enabled", True)))
+            self.col_flash.set_color(str(fl.get("color", "#FFFFFF")))
+            self.spin_flash_int.setValue(int(fl.get("intensity", 100)))
+            self.spin_flash_tail.setValue(int(fl.get("fade_tail_ms", 220)))
+            self.spin_flash_bin_fade.setValue(int(fl.get("binary_fade_ms", 650)))
 
-        sh = eff.get("shot", {})
-        self.chk_shot.setChecked(bool(sh.get("enabled", True)))
-        self.col_shot.set_color(str(sh.get("color", "#FF9900")))
-        self.spin_shot_dur.setValue(int(sh.get("duration_ms", 50)))
-        self.spin_shot_deb.setValue(int(sh.get("debounce_ms", 40)))
-        self.spin_shot_int.setValue(int(sh.get("intensity", 100)))
+            sh = eff.get("shot", {})
+            self.chk_shot.setChecked(bool(sh.get("enabled", True)))
+            self.col_shot.set_color(str(sh.get("color", "#FF9900")))
+            self.spin_shot_dur.setValue(int(sh.get("duration_ms", 50)))
+            self.spin_shot_deb.setValue(int(sh.get("debounce_ms", 40)))
+            self.spin_shot_int.setValue(int(sh.get("intensity", 100)))
 
-        fr = eff.get("fire", {})
-        self.chk_fire.setChecked(bool(fr.get("enabled", True)))
-        self.col_fire_1.set_color(str(fr.get("color_primary", "#FF2200")))
-        self.col_fire_2.set_color(str(fr.get("color_secondary", "#FF9900")))
-        self.spin_fire_hz.setValue(float(fr.get("oscillation_hz", 4.0)))
-        self.spin_fire_int.setValue(int(fr.get("intensity", 100)))
+            fr = eff.get("fire", {})
+            self.chk_fire.setChecked(bool(fr.get("enabled", True)))
+            self.col_fire_1.set_color(str(fr.get("color_primary", "#FF2200")))
+            self.col_fire_2.set_color(str(fr.get("color_secondary", "#FF9900")))
+            self.spin_fire_hz.setValue(float(fr.get("oscillation_hz", 4.0)))
+            self.spin_fire_int.setValue(int(fr.get("intensity", 100)))
 
-        c4 = eff.get("c4", {})
-        self.chk_c4.setChecked(bool(c4.get("enabled", True)))
-        self.col_c4.set_color(str(c4.get("color", "#FF0000")))
-        self.spin_c4_timer.setValue(float(c4.get("bomb_timer_s", 40.0)))
-        self.spin_c4_init_int.setValue(float(c4.get("initial_interval_s", 1.0)))
-        self.spin_c4_min_int.setValue(float(c4.get("min_interval_s", 0.15)))
-        self.spin_c4_beep_dur.setValue(float(c4.get("beep_duration_s", 0.24)))
-        self.spin_c4_int.setValue(int(c4.get("intensity", 100)))
+            c4 = eff.get("c4", {})
+            self.chk_c4.setChecked(bool(c4.get("enabled", True)))
+            self.col_c4.set_color(str(c4.get("color", "#FF0000")))
+            self.spin_c4_timer.setValue(float(c4.get("bomb_timer_s", 40.0)))
+            self.spin_c4_init_int.setValue(float(c4.get("initial_interval_s", 1.0)))
+            self.spin_c4_min_int.setValue(float(c4.get("min_interval_s", 0.15)))
+            self.spin_c4_beep_dur.setValue(float(c4.get("beep_duration_s", 0.24)))
+            self.spin_c4_int.setValue(int(c4.get("intensity", 100)))
 
-        hp = eff.get("health", {})
-        self.chk_health.setChecked(bool(hp.get("enabled", False)))
-        self.spin_hp_crit_thresh.setValue(int(hp.get("critical_threshold", 25)))
-        self.spin_hp_crit_hz.setValue(float(hp.get("critical_pulse_hz", 2.5)))
-        self.col_hp_100.set_color(str(hp.get("color_100", "#00FF00")))
-        self.col_hp_75.set_color(str(hp.get("color_75", "#80FF00")))
-        self.col_hp_50.set_color(str(hp.get("color_50", "#FFFF00")))
-        self.col_hp_25.set_color(str(hp.get("color_25", "#FF9900")))
-        self.col_hp_crit.set_color(str(hp.get("color_critical", "#FF0000")))
-        self.spin_hp_int.setValue(int(hp.get("intensity", 100)))
+            hp = eff.get("health", {})
+            self.chk_health.setChecked(bool(hp.get("enabled", False)))
+            self.spin_hp_crit_thresh.setValue(int(hp.get("critical_threshold", 25)))
+            self.spin_hp_crit_hz.setValue(float(hp.get("critical_pulse_hz", 2.5)))
+            self.col_hp_100.set_color(str(hp.get("color_100", "#00FF00")))
+            self.col_hp_75.set_color(str(hp.get("color_75", "#80FF00")))
+            self.col_hp_50.set_color(str(hp.get("color_50", "#FFFF00")))
+            self.col_hp_25.set_color(str(hp.get("color_25", "#FF9900")))
+            self.col_hp_crit.set_color(str(hp.get("color_critical", "#FF0000")))
+            self.spin_hp_int.setValue(int(hp.get("intensity", 100)))
 
-        tm = eff.get("team", {})
-        self.chk_team.setChecked(bool(tm.get("enabled", False)))
-        self.chk_freezetime_pulse.setChecked(bool(tm.get("freezetime_pulse", True)))
-        self.col_t.set_color(str(tm.get("t_color", "#FF9900")))
-        self.col_ct.set_color(str(tm.get("ct_color", "#008CFF")))
-        self.spin_freeze_hz.setValue(float(tm.get("freezetime_pulse_hz", 0.8)))
-        self.spin_team_int.setValue(int(tm.get("intensity", 100)))
+            tm = eff.get("team", {})
+            self.chk_team.setChecked(bool(tm.get("enabled", False)))
+            self.chk_freezetime_pulse.setChecked(bool(tm.get("freezetime_pulse", True)))
+            self.col_t.set_color(str(tm.get("t_color", "#FF9900")))
+            self.col_ct.set_color(str(tm.get("ct_color", "#008CFF")))
+            self.spin_freeze_hz.setValue(float(tm.get("freezetime_pulse_hz", 0.8)))
+            self.spin_team_int.setValue(int(tm.get("intensity", 100)))
 
-        wp = eff.get("weapons", {})
-        self.chk_weapons.setChecked(bool(wp.get("enabled", False)))
-        self.spin_weapons_int.setValue(int(wp.get("intensity", 100)))
-        cats = wp.get("categories", {})
-        for key, picker in self._weapon_pickers.items():
-            picker.set_color(str(cats.get(key, "#CCCCCC")))
+            wp = eff.get("weapons", {})
+            self.chk_weapons.setChecked(bool(wp.get("enabled", False)))
+            self.spin_weapons_int.setValue(int(wp.get("intensity", 100)))
+            cats = wp.get("categories", {})
+            for key, picker in self._weapon_pickers.items():
+                picker.set_color(str(cats.get(key, "#CCCCCC")))
 
-        loaded_prio = [
-            str(x) for x in cfg.get("priorities", _DEFAULT_PRIORITY_IDS) if x in _DEFAULT_PRIORITY_IDS
-        ]
-        for pid in _DEFAULT_PRIORITY_IDS:
-            if pid not in loaded_prio:
-                loaded_prio.append(pid)
-        self._priority_ids = loaded_prio
+            loaded_prio = [
+                str(x)
+                for x in cfg.get("priorities", _DEFAULT_PRIORITY_IDS)
+                if x in _DEFAULT_PRIORITY_IDS
+            ]
+            for pid in _DEFAULT_PRIORITY_IDS:
+                if pid not in loaded_prio:
+                    loaded_prio.append(pid)
+            self._priority_ids = loaded_prio
+        finally:
+            self._loading = False
         self._rebuild_master_order()
         self._select_group(self._selected_group)
 
@@ -800,15 +897,15 @@ class EffectsPage(QWidget):
         ok, msg = self._service.apply_config(updated)
         self.statusMessage.emit(msg)
         if not ok:
-            QMessageBox.warning(self, "Erro de Configuração", msg)
+            QMessageBox.warning(self, t("dialogs.config_error_title"), msg)
 
     def _on_restore_defaults(self) -> None:
         reply = QMessageBox.question(
             self,
-            "Restaurar Padrões",
-            "Deseja restaurar as cores, durações, velocidades e prioridades padrão?",
+            t("dialogs.restore_effects_title"),
+            t("dialogs.restore_effects_body"),
         )
         if reply == QMessageBox.StandardButton.Yes:
             restored = self._service.restore_default_settings()
             self.load_from_config(restored)
-            self.statusMessage.emit("Configurações padrão restauradas.")
+            self.statusMessage.emit(t("dialogs.defaults_restored"))
