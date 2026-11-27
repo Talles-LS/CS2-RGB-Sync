@@ -6,7 +6,14 @@
     <a href="README.md">English</a> &nbsp;|&nbsp; <strong>Português (Brasil)</strong>
   </p>
   <p>
-    <code>Interface Obsidian Calibre</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>Status: 0.1.0 Pré-Lançamento</code>
+    <code>Interface Obsidian Calibre</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.1.0-rc1</code>
+  </p>
+  <p>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.1.0-rc1/CS2RGBSync_Setup.exe"><strong>Baixar Instalador (CS2RGBSync_Setup.exe)</strong></a>
+    &nbsp;|&nbsp;
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.1.0-rc1/CS2RGBSync_Portable.zip"><strong>Baixar Versão Portátil (.zip)</strong></a>
+    &nbsp;|&nbsp;
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.1.0-rc1">Notas da Release &amp; SHA-256</a>
   </p>
 </div>
 
