@@ -9,11 +9,9 @@
     <code>Obsidian Calibre UI</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.2.0</code>
   </p>
   <p>
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe"><strong>Download Installer (CS2RGBSync_Setup_v0.2.0.exe)</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.2.0"><strong>v0.2.0 Release Notes &amp; Checksums</strong></a>
     &nbsp;|&nbsp;
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Portable_v0.2.0.zip"><strong>Download Portable ZIP (v0.2.0)</strong></a>
-    &nbsp;|&nbsp;
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.2.0">Release Notes &amp; SHA-256</a>
+    <a href="docs/INSTALLATION.md"><strong>Installation &amp; Run from Source Guide</strong></a>
   </p>
 </div>
 
@@ -92,14 +90,14 @@ Important hardware notes:
 
 ### Option A: Windows Installer (`CS2RGBSync_Setup_v0.2.0.exe`)
 
-1. Download [`CS2RGBSync_Setup_v0.2.0.exe`](https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe) from the GitHub Release page (or local `release-artifacts/` directory).
+1. Generate locally via `build.bat` / Inno Setup (`release-artifacts/CS2RGBSync_Setup_v0.2.0.exe`). *(Public binary downloads for `v0.2.0` are withheld until Corsair `iCUESDK.x64_2019.dll` public redistribution terms are confirmed; see [`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt).)*
 2. Run the installer and select optional tasks (Desktop shortcut, Windows startup with `--minimized`, automatic CS2 GSI setup).
 3. If GSI auto-setup is enabled, confirm the detected Steam/CS2 folder (`...\Counter-Strike Global Offensive\game\csgo`) or browse to it manually.
 4. Launch **CS2 RGB Sync**.
 
 ### Option B: Portable Archive (`CS2RGBSync_Portable_v0.2.0.zip`)
 
-1. Extract the **entire** ZIP archive preserving the `CS2RGBSync\` directory structure (`CS2RGBSync.exe` alongside `_internal\`). Do not move `CS2RGBSync.exe` out of its folder.
+1. Extract the locally built ZIP archive preserving the `CS2RGBSync\` directory structure (`CS2RGBSync.exe` alongside `_internal\`). Do not move `CS2RGBSync.exe` out of its folder.
 2. Launch `CS2RGBSync.exe` (no Python installation required).
 3. Go to **Settings** -> **Detect Steam** (or **Browse Folder...**) -> **Install / Update GSI File**.
 
