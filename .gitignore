@@ -1,0 +1,51 @@
+# Python environments & bytecode
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Build, packaging & release artifacts
+build/
+dist/
+release/
+release-artifacts/
+*.exe
+*.zip
+*.msi
+MANUAL_INSTALACAO.pdf
+
+# Test & coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment variables, local secrets & personal configs
+.env
+.env.*
+config.json
+gamestate_integration_cs2rgbsync.local.cfg
+
+# Keep official project config templates tracked
+!config/default_config.json
+!config.example.json
+!gsi/gamestate_integration_cs2rgbsync.cfg
+
+# Logs, temporary & backup files
+logs/
+*.log
+*.log.*
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# IDE & OS artifacts
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store

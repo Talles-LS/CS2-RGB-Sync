@@ -1,0 +1,16 @@
+# Dependências do CS2 RGB Sync (Python 3.12 - Windows 11 64-bit)
+# Hardware / Sistema
+cuesdk==4.0.84
+psutil>=7.0.0
+
+# Servidor HTTP local para CS2 Game State Integration (GSI)
+Flask>=3.0.0
+
+# Interface Gráfica Desktop
+PySide6>=6.7.0
+
+# Testes automatizados
+pytest>=8.0.0
+
+# Empacotamento executável Windows
+pyinstaller>=6.0.0

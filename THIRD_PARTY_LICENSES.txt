@@ -1,0 +1,38 @@
+CS2 RGB Sync — Licenças de Terceiros e Avisos de Redistribuição
+==================================================================
+
+O código-fonte original do CS2 RGB Sync é licenciado sob a MIT License
+(consulte `LICENSE`, Copyright (c) 2026 Tales Souza). A licença MIT do
+projeto NÃO se estende a componentes de terceiros ou binários proprietários
+listados abaixo, cada qual regido por sua respectiva licença ou EULA.
+
+Este software é 100% local, gratuito e não utiliza APIs comerciais ou
+serviços em nuvem. Abaixo estão os componentes de terceiros incluídos ou
+necessários para execução:
+
+1. Python 3.12
+   Licença: Python Software Foundation License Version 2 (PSF-2.0)
+
+2. PySide6 / Shiboken6
+   Licença: GNU Lesser General Public License v3 (LGPL-3.0)
+   Permite redistribuição em conjunto com a aplicação respeitando os termos
+   da LGPLv3 (bibliotecas dinâmicas do Qt6 mantidas em _internal/PySide6).
+
+3. Flask, Werkzeug, Jinja2, Click, ItsDangerous, MarkupSafe
+   Licença: BSD-3-Clause
+
+4. blinker
+   Licença: MIT License
+
+5. psutil
+   Licença: BSD-3-Clause
+
+6. cue-sdk-python (wrapper Python `cuesdk`)
+   Licença: MIT License (Copyright (c) 2020 Corsair Memory, Inc.)
+
+7. Corsair iCUE SDK (`iCUESDK.x64_2019.dll`)
+   Componente proprietário de Corsair Memory, Inc., regido pelos termos
+   oficiais do Corsair iCUE SDK (distinto da licença MIT do wrapper Python
+   `cuesdk`). Redistribuído sem modificações em sua forma binária original.
+   Requer a instalação prévia do software oficial Corsair iCUE no computador
+   de destino para comunicação com dispositivos Corsair compatíveis.
