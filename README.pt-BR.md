@@ -6,14 +6,14 @@
     <a href="README.md">English</a> &nbsp;|&nbsp; <strong>Português (Brasil)</strong>
   </p>
   <p>
-    <code>Interface Obsidian Calibre</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.1.0-rc1</code>
+    <code>Interface Obsidian Calibre</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.2.0</code>
   </p>
   <p>
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.1.0-rc1/CS2RGBSync_Setup.exe"><strong>Baixar Instalador (CS2RGBSync_Setup.exe)</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe"><strong>Baixar Instalador (CS2RGBSync_Setup_v0.2.0.exe)</strong></a>
     &nbsp;|&nbsp;
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.1.0-rc1/CS2RGBSync_Portable.zip"><strong>Baixar Versão Portátil (.zip)</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Portable_v0.2.0.zip"><strong>Baixar Versão Portátil (v0.2.0 .zip)</strong></a>
     &nbsp;|&nbsp;
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.1.0-rc1">Notas da Release &amp; SHA-256</a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.2.0">Notas da Release &amp; SHA-256</a>
   </p>
 </div>
 
@@ -34,20 +34,21 @@ Ele integra a API oficial **Game State Integration (GSI)** do CS2 em loopback (`
 - **Descoberta Dinâmica via iCUE SDK:** Consulta dispositivos Corsair via `CorsairDeviceType.CDT_All` e lê zonas/LEDs dinamicamente com `get_led_positions(device_id)` (ou prioriza `hardware.target_model` quando preenchido).
 - **8 Efeitos Configuráveis com Hierarquia de Prioridade:** Flashbang, Disparo, Dano de Fogo, C4 Plantada, Vida Crítica, Gradiente de Vida, Freezetime por Equipe (CT/TR) e Arma Equipada.
 - **Cores CT / TR Exclusivas no Freezetime:** As cores personalizadas de equipe acendem exclusivamente durante o **Freezetime** (usando `round.phase` e `phase_countdowns.phase`) e apagam imediatamente ao iniciar a rodada.
-- **Interface Obsidian Calibre (PySide6):** Painel de controle com emissor óptico genérico e telemetria ao vivo, editor de Efeitos RGB, Configurações, Diagnóstico com mascaramento automático de segredos (`***REDACTED***`), Modo de Simulação interno e bandeja do sistema.
+- **Interface Obsidian Calibre (PySide6):** Painel de controle com emissor óptico genérico e telemetria ao vivo, editor de Efeitos RGB, Configurações, Diagnóstico com mascaramento automático de segredos (`***REDACTED***`), Simulador Manual completo (**Pausar / Retomar / Reiniciar / Parar**) e bandeja do sistema.
+- **Suporte Multilíngue em Tempo Real (i18n):** Padrão em **Inglês (`en_US`)** com seletor instantâneo em **Configurações → Idioma** entre **English**, **Português (Brasil)** e **Español**, sem precisar reiniciar.
 - **Devolução Limpa ao iCUE:** Devolve o controle de iluminação (`alpha = 0` + `release_control`) ao encerrar, parar a integração, desconectar ou entrar no menu do CS2.
 
 ---
 
 ## 3. Capturas de Tela
 
-Capturadas diretamente do executável Windows recompilado (`CS2RGBSync.exe`, identidade **Obsidian Calibre** + marca **Optical Reticle**, sem caminhos pessoais ou tokens reais):
+Capturadas diretamente do executável Windows recompilado (`CS2RGBSync.exe`, interface padrão em **Inglês**, identidade **Obsidian Calibre** + marca **Optical Reticle**, sem caminhos pessoais ou tokens reais):
 
-| Painel de Controle (`Painel`) | Estúdio de Efeitos (`Efeitos RGB`) |
+| Painel de Controle (`Dashboard`) | Estúdio de Efeitos (`RGB Effects`) |
 | :---: | :---: |
 | ![Painel CS2 RGB Sync](docs/assets/dashboard.png) | ![Efeitos CS2 RGB Sync](docs/assets/effects.png) |
 
-| Configurações Locais e Hardware (`Configurações`) | Diagnóstico e Logs (`Diagnóstico`) |
+| Configurações Locais e Hardware (`Settings`) | Diagnóstico e Logs (`Diagnostics`) |
 | :---: | :---: |
 | ![Configurações CS2 RGB Sync](docs/assets/settings.png) | ![Diagnóstico CS2 RGB Sync](docs/assets/diagnostics.png) |
 
@@ -90,18 +91,18 @@ Observações importantes:
 
 > Instruções detalhadas também estão disponíveis em [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 
-### Opção A: Instalador Windows (`CS2RGBSync_Setup.exe`)
+### Opção A: Instalador Windows (`CS2RGBSync_Setup_v0.2.0.exe`)
 
-1. Baixe `CS2RGBSync_Setup.exe` em `release-artifacts/` (ou em uma futura Release oficial do GitHub).
+1. Baixe [`CS2RGBSync_Setup_v0.2.0.exe`](https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe) na página de Releases (ou em `release-artifacts/`).
 2. Execute o instalador e selecione as opções desejadas (atalho na Área de Trabalho, iniciar com o Windows em `--minimized`, configuração automática do GSI).
 3. Se a configuração GSI estiver marcada, confirme a pasta detectada do CS2 (`...\Counter-Strike Global Offensive\game\csgo`) ou selecione-a manualmente.
 4. Conclua a instalação e abra o **CS2 RGB Sync**.
 
-### Opção B: Versão Portátil (`CS2RGBSync_Portable.zip`)
+### Opção B: Versão Portátil (`CS2RGBSync_Portable_v0.2.0.zip`)
 
 1. Extraia o arquivo ZIP **completo** preservando a estrutura da pasta `CS2RGBSync\` (`CS2RGBSync.exe` ao lado de `_internal\`). Não separe o `.exe` da pasta `_internal`.
 2. Execute `CS2RGBSync.exe` (não exige Python instalado).
-3. Acesse **Configurações** -> **Detectar** (ou **Selecionar Pasta...**) -> **Instalar / Atualizar Arquivo GSI**.
+3. Acesse **Settings** (*Configurações*) -> opcionalmente troque o idioma em **01 · Language** -> **Detect Steam** (ou **Browse Folder...**) -> **Install / Update GSI File**.
 
 ### Opção C: Execução pelo Código-Fonte
 
@@ -299,13 +300,13 @@ Consulte [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) para diagnóstico 
 
 ## 19. Releases e Versionamento
 
-O projeto encontra-se em preparação local de **Pré-Lançamento / Release Candidate (`0.1.0`)**, sem tag pública ou Release publicada até autorização do mantenedor.
+Versão atual: **`v0.2.0`** (com preservação da release anterior `v0.1.0-rc1`). Consulte o [`CHANGELOG.md`](CHANGELOG.md) e a página de Releases do repositório.
 
 ---
 
 ## 20. Roadmap
 
-Não há roadmap público formal definido nesta etapa além da consolidação da versão `0.1.0`.
+Além da consolidação da versão `v0.2.0` e do suporte completo a `en_US`, `pt_BR` e `es_ES`, evoluções futuras dependem de testes da comunidade em outros periféricos Corsair iCUE SDK e da verificação dos termos de redistribuição antes de eventual abertura pública de binários.
 
 ---
 

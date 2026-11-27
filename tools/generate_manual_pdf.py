@@ -27,7 +27,7 @@ MANUAL_HTML = """
 </head>
 <body>
   <h1>Manual de Instalação e Uso — CS2 RGB Sync</h1>
-  <p><strong>Versão:</strong> 0.1.0 (Release Candidate) &nbsp;|&nbsp; <strong>Plataforma:</strong> Windows 11 (64 bits) &nbsp;|&nbsp; <strong>Hardware:</strong> Dispositivos Corsair compatíveis com iCUE SDK</p>
+  <p><strong>Versão:</strong> 0.2.0 &nbsp;|&nbsp; <strong>Plataforma:</strong> Windows 11 (64 bits) &nbsp;|&nbsp; <strong>Idiomas:</strong> English (padrão), Português (Brasil), Español &nbsp;|&nbsp; <strong>Hardware:</strong> Dispositivos Corsair compatíveis com iCUE SDK</p>
   <div class="box">
     <strong>Arquitetura 100% Local e Segura:</strong> O CS2 RGB Sync utiliza exclusivamente a API oficial
     <em>Game State Integration (GSI)</em> da Valve em <code>127.0.0.1</code> e o <em>Corsair iCUE SDK</em> oficial.
@@ -85,7 +85,8 @@ MANUAL_HTML = """
 
   <h2>8. Como testar os efeitos (Modo de Simulação e Partida)</h2>
   <ul>
-    <li><strong>Sem abrir o CS2:</strong> no Painel, marque <strong>Ativar Modo de Simulação</strong> (um banner de alerta laranja indicará que os dados são simulados) e teste Flashbang, Disparo, C4 plantada, Dano de fogo, Vida Crítica, Freezetime CT/TR e Armas diretamente no dispositivo conectado.</li>
+    <li><strong>Sem abrir o CS2:</strong> no Painel, marque <strong>Ativar controles</strong> no Simulador Manual (um banner de alerta laranja indicará que os dados são simulados) e teste Flashbang, Disparo, C4 plantada, Dano de fogo, Vida Crítica, Freezetime CT/TR e Armas com controles completos de <strong>Pausar / Retomar / Reiniciar / Parar</strong>.</li>
+    <li><strong>Troca de idioma instantânea:</strong> acesse <strong>Configurações → Idioma</strong> para alternar entre <em>English</em>, <em>Português (Brasil)</em> e <em>Español</em> em tempo real sem reiniciar.</li>
     <li><strong>Em partida real:</strong> desative o Modo de Simulação, mantenha a integração iniciada e entre em uma partida (ou treino com bots) no CS2.</li>
   </ul>
 

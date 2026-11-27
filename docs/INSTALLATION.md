@@ -27,19 +27,20 @@
 
 ### Uninstalling
 
-- Close **CS2 RGB Sync** completely from the Windows system tray (*Right-click tray icon -> Sair*).
+- Close **CS2 RGB Sync** completely from the Windows system tray (*Right-click tray icon -> Quit*).
 - Open **Windows Settings -> Apps -> Installed apps -> CS2 RGB Sync -> Uninstall**.
 - During uninstallation, you can choose whether to remove the managed `gamestate_integration_cs2rgbsync.cfg` file. Personal preferences in `%LOCALAPPDATA%\CS2RGBSync\` are left untouched unless removed manually.
 
 ---
 
-## Option 2: Portable ZIP (`CS2RGBSync_Portable.zip`)
+## Option 2: Portable ZIP (`CS2RGBSync_Portable_v0.2.0.zip`)
 
 1. Extract the **entire** archive preserving its directory structure so `CS2RGBSync.exe` and the `_internal\` folder remain side-by-side in `CS2RGBSync\`.
 2. Run `CS2RGBSync\CS2RGBSync.exe`. (Python does **not** need to be installed.)
-3. Open **Configurações** (*Settings*) inside the app:
-   - Click **Detectar** (or **Selecionar Pasta...**) to locate `...\Counter-Strike Global Offensive\game\csgo`.
-   - Click **Instalar / Atualizar Arquivo GSI** to write `gamestate_integration_cs2rgbsync.cfg`.
+3. Open **Settings** inside the app:
+   - *(Optional)* Switch the interface language in **01 · Language** (`English`, `Português (Brasil)`, `Español`).
+   - Click **Detect Steam** (or **Browse Folder...**) to locate `...\Counter-Strike Global Offensive\game\csgo`.
+   - Click **Install / Update GSI File** to write `gamestate_integration_cs2rgbsync.cfg`.
 4. Restart Counter-Strike 2 if it was already open so CS2 loads the new GSI `.cfg` file.
 
 ---

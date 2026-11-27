@@ -6,14 +6,14 @@
     <strong>English</strong> &nbsp;|&nbsp; <a href="README.pt-BR.md">Português (Brasil)</a>
   </p>
   <p>
-    <code>Obsidian Calibre UI</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.1.0-rc1</code>
+    <code>Obsidian Calibre UI</code> &nbsp;·&nbsp; <code>Valve CS2 GSI (127.0.0.1)</code> &nbsp;·&nbsp; <code>Corsair iCUE SDK v4</code> &nbsp;·&nbsp; <code>v0.2.0</code>
   </p>
   <p>
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.1.0-rc1/CS2RGBSync_Setup.exe"><strong>Download Installer (CS2RGBSync_Setup.exe)</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe"><strong>Download Installer (CS2RGBSync_Setup_v0.2.0.exe)</strong></a>
     &nbsp;|&nbsp;
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.1.0-rc1/CS2RGBSync_Portable.zip"><strong>Download Portable ZIP</strong></a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Portable_v0.2.0.zip"><strong>Download Portable ZIP (v0.2.0)</strong></a>
     &nbsp;|&nbsp;
-    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.1.0-rc1">Release Notes &amp; SHA-256</a>
+    <a href="https://github.com/Talles-LS/CS2-RGB-Sync/releases/tag/v0.2.0">Release Notes &amp; SHA-256</a>
   </p>
 </div>
 
@@ -34,20 +34,21 @@ It connects Counter-Strike 2's official **Game State Integration (GSI)** HTTP pu
 - **Dynamic Corsair Device Discovery:** Enumerates Corsair devices through the iCUE SDK (`CorsairDeviceType.CDT_All`) and reads addressable RGB LEDs dynamically via `get_led_positions(device_id)` (or filters via an optional `hardware.target_model` preference).
 - **8 Configurable Effects with Priority Resolution:** Flashbang, Weapon Shot, Fire Damage, C4 Planted, Critical Health, Health Gradient, Team Freezetime (CT/TR), and Active Weapon Category.
 - **Freezetime-Scoped Team Colors:** Custom CT and TR colors trigger exclusively during CS2 **Freezetime** (using `round.phase` and `phase_countdowns.phase`) and clear immediately when the round becomes live.
-- **Obsidian Calibre Desktop GUI (PySide6):** Dashboard with optical emitter preview and live telemetry, Effects editor with priority reordering, Settings panel, Diagnostics view with token redaction (`***REDACTED***`), Built-in Simulator, and Windows system tray integration.
+- **Obsidian Calibre Desktop GUI (PySide6):** Dashboard with optical emitter preview and live telemetry, Effects editor with priority reordering, Settings panel, Diagnostics view with token redaction (`***REDACTED***`), Built-in Simulator with **Start / Pause / Resume / Reset / Stop** lifecycle controls, and Windows system tray integration.
+- **Instant Multi-Language Support (i18n):** Defaults to **English (`en_US`)** with one-click live runtime switching between **English**, **Português (Brasil)**, and **Español** in **Settings → Language** (no restart required).
 - **Non-Destructive Lighting Handback:** Releases SDK lighting control (`alpha = 0` + `release_control`) when CS2 is in menus, disconnected, or when stopping/exiting the app so your normal iCUE profile resumes immediately.
 
 ---
 
 ## 3. Screenshots
 
-Captured directly from the compiled Windows executable (`CS2RGBSync.exe`, **Obsidian Calibre** UI + **Optical Reticle** mark, no personal paths or live tokens):
+Captured directly from the compiled Windows executable (`CS2RGBSync.exe`, default **English** UI, **Obsidian Calibre** theme + **Optical Reticle** mark, no personal paths or live tokens):
 
-| Control Dashboard (`Painel`) | RGB Effects Studio (`Efeitos RGB`) |
+| Control Dashboard (`Dashboard`) | RGB Effects Studio (`RGB Effects`) |
 | :---: | :---: |
 | ![CS2 RGB Sync Dashboard](docs/assets/dashboard.png) | ![CS2 RGB Sync Effects](docs/assets/effects.png) |
 
-| Local & Hardware Settings (`Configurações`) | Live Diagnostics & Logs (`Diagnóstico`) |
+| Local & Hardware Settings (`Settings`) | Live Diagnostics & Logs (`Diagnostics`) |
 | :---: | :---: |
 | ![CS2 RGB Sync Settings](docs/assets/settings.png) | ![CS2 RGB Sync Diagnostics](docs/assets/diagnostics.png) |
 
@@ -89,18 +90,18 @@ Important hardware notes:
 
 > Detailed step-by-step instructions are also available in [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 
-### Option A: Windows Installer (`CS2RGBSync_Setup.exe`)
+### Option A: Windows Installer (`CS2RGBSync_Setup_v0.2.0.exe`)
 
-1. Download `CS2RGBSync_Setup.exe` from the local `release-artifacts/` directory (or a future official GitHub Release).
+1. Download [`CS2RGBSync_Setup_v0.2.0.exe`](https://github.com/Talles-LS/CS2-RGB-Sync/releases/download/v0.2.0/CS2RGBSync_Setup_v0.2.0.exe) from the GitHub Release page (or local `release-artifacts/` directory).
 2. Run the installer and select optional tasks (Desktop shortcut, Windows startup with `--minimized`, automatic CS2 GSI setup).
 3. If GSI auto-setup is enabled, confirm the detected Steam/CS2 folder (`...\Counter-Strike Global Offensive\game\csgo`) or browse to it manually.
 4. Launch **CS2 RGB Sync**.
 
-### Option B: Portable Archive (`CS2RGBSync_Portable.zip`)
+### Option B: Portable Archive (`CS2RGBSync_Portable_v0.2.0.zip`)
 
 1. Extract the **entire** ZIP archive preserving the `CS2RGBSync\` directory structure (`CS2RGBSync.exe` alongside `_internal\`). Do not move `CS2RGBSync.exe` out of its folder.
 2. Launch `CS2RGBSync.exe` (no Python installation required).
-3. Go to **Configurações** (*Settings*) -> **Detectar** (or **Selecionar Pasta...**) -> **Instalar / Atualizar Arquivo GSI**.
+3. Go to **Settings** -> **Detect Steam** (or **Browse Folder...**) -> **Install / Update GSI File**.
 
 ### Option C: Run from Source
 
@@ -117,11 +118,12 @@ python main.py
 
 1. Open **Corsair iCUE**, go to **Settings -> SDK**, and enable **iCUE SDK / Game & Application Integrations**.
 2. Open **CS2 RGB Sync**.
-3. On **Configurações** (*Settings*):
+3. On **Settings**:
+   - *(Optional)* Choose your preferred language (`English`, `Português (Brasil)`, or `Español`) in **01 · Language**.
    - Verify or select your Counter-Strike 2 folder (`...\game\csgo`).
-   - Click **Instalar / Atualizar Arquivo GSI** to write `gamestate_integration_cs2rgbsync.cfg`.
-4. Return to **Painel** (*Dashboard*) and verify **Corsair iCUE** and your detected Corsair device appear ready.
-5. Click **INICIAR INTEGRAÇÃO**.
+   - Click **Install / Update GSI File** to write `gamestate_integration_cs2rgbsync.cfg`.
+4. Return to **Dashboard** and verify **Corsair iCUE** and your detected Corsair device appear ready.
+5. Click **START INTEGRATION**.
 6. Launch Counter-Strike 2 (if CS2 was already open when writing the `.cfg`, restart CS2 once so it reloads GSI configurations).
 
 ---
@@ -307,8 +309,9 @@ CS2 RGB Sync/
 │   ├── TROUBLESHOOTING.md
 │   └── assets/                  # GitHub README logo, icon, and live app screenshots
 ├── installer/
-│   └── CS2RGBSync.iss           # Inno Setup 6 Windows installer script
-├── tests/                       # Automated unit, integration, Freezetime & offscreen UI tests (50 tests)
+│   └── CS2RGBSync.iss           # Inno Setup 6 multi-language Windows installer script
+├── locales/                     # UI & engine JSON translations (en_US, pt_BR, es_ES)
+├── tests/                       # Automated unit, integration, i18n, simulator & UI tests (56 tests)
 ├── tools/                       # Icon/manual PDF generators, GSI probe & legacy hardware test scripts
 ├── config.example.json          # Safe anonymized user config template
 ├── CS2RGBSync.spec              # PyInstaller onedir build spec
@@ -386,13 +389,13 @@ Common issues (iCUE SDK disabled, CS2 not sending GSI, port 3000 conflict, Freez
 
 ## 19. Releases & Versioning
 
-This repository is currently at **`0.1.0` (Pre-Release / Release Candidate local preparation)**. No public GitHub tag or Release has been published yet.
+Latest release tag: **`v0.2.0`** (keeping `v0.1.0-rc1` preserved in release history). See [`CHANGELOG.md`](CHANGELOG.md) and the [GitHub Releases](https://github.com/Talles-LS/CS2-RGB-Sync/releases) page.
 
 ---
 
 ## 20. Roadmap
 
-There is currently no formal public roadmap committed beyond stabilizing pre-release builds and documenting community feedback on additional Corsair device models exposed via iCUE SDK.
+Beyond stabilizing `v0.2.0` and maintaining multi-language support (`en_US`, `pt_BR`, `es_ES`), future work depends on community feedback regarding additional Corsair iCUE SDK device models and verifying third-party redistribution terms before public binary distribution.
 
 ---
 

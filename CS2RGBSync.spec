@@ -9,6 +9,7 @@ icue_dll = cuesdk_dir / "bin" / "iCUESDK.x64_2019.dll"
 
 datas = [
     ("config/default_config.json", "config"),
+    ("locales", "locales"),
     ("gsi/gamestate_integration_cs2rgbsync.cfg", "gsi"),
     ("assets/icons", "assets/icons"),
     ("THIRD_PARTY_LICENSES.txt", "."),

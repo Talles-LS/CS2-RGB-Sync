@@ -67,6 +67,7 @@ By default, only match-reactive combat/objective effects are enabled (`flashbang
 - `weapons`: `enabled: false`, `intensity: 100`, `categories` (`knife`, `pistol`, `rifle`, `sniper`, `smg`, `shotgun`, `grenade`).
 
 ### `ui`
+- `language` *(string)*: Active interface language code (`"en_US"` default; supported: `"en_US"`, `"pt_BR"`, `"es_ES"`). Can also be changed live in **Settings → 01 · Language** without restarting.
 - `start_with_windows` *(bool)*: Registers/removes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\CS2RGBSync` (`--minimized`).
 - `minimize_to_tray` *(bool)*: Default `true`. Closing the window hides it to the system tray instead of quitting.
 - `auto_start_integration` *(bool)*: Default `false`. Starts GSI server + RGB engine automatically upon launch.

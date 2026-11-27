@@ -52,6 +52,12 @@ Por padrão, apenas efeitos reativos de partida começam ativados (`flashbang`, 
 - `team`: `enabled` (`false`), `t_color` (`#FF9900`), `ct_color` (`#008CFF`), `freezetime_pulse` (`true`), `freezetime_pulse_hz` (`0.8`), `intensity` (`100`) — aplicado exclusivamente durante o Freezetime.
 - `weapons`: `enabled` (`false`), `intensity` (`100`), `categories` (`knife`, `pistol`, `rifle`, `sniper`, `smg`, `shotgun`, `grenade`).
 
+### `ui`
+- `language`: idioma ativo da interface (`"en_US"` por padrão; valores suportados: `"en_US"`, `"pt_BR"`, `"es_ES"`). Pode ser alterado em tempo real em **Configurações → Idioma** sem reiniciar.
+- `start_with_windows`: inicia minimizado na bandeja junto com o Windows.
+- `minimize_to_tray`: minimiza para a bandeja do sistema ao fechar a janela (`true` padrão).
+- `auto_start_integration`: inicia automaticamente o servidor GSI e o motor RGB ao abrir o app (`false` padrão).
+
 ---
 
 ## 3. Arquivo GSI no CS2
